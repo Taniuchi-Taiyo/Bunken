@@ -1,7 +1,7 @@
 # Bunken: A reference manager for researchers
 
 Bunken は、研究者向けの軽量な文献管理ツールです。  
-ブラウザで動作し、文献の追加・整理・メモ・BibTeX 出力をローカル環境で完結できます。
+*自己責任での利用をお願いします。
 
 ## Features
 
