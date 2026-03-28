@@ -4,9 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>bunken — 文献管理</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://api.crossref.org https://export.arxiv.org https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <meta name="referrer" content="no-referrer">
   <style>
     /* ===== VARIABLES ===== */
     :root {
@@ -31,9 +30,9 @@
       --shadow-lg:  0 8px 40px rgba(0,0,0,0.14);
       --r:          6px;
       --r-sm:       4px;
-      --ff:         'Outfit', system-ui, sans-serif;
-      --ft:         'Spectral', Georgia, serif;
-      --fm:         'JetBrains Mono', monospace;
+      --ff:         system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --ft:         'Georgia', 'Times New Roman', serif;
+      --fm:         ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -304,6 +303,7 @@
       text-decoration: none; font-weight: 500; transition: background .1s;
     }
     .d-link:hover { background: var(--accent-lt); }
+    button.d-link { background: none; cursor: pointer; font-family: var(--ff); }
     .d-cit {
       font-size: 12px; color: var(--text-2); margin-bottom: 12px;
       display: flex; align-items: baseline; gap: 5px;
@@ -550,17 +550,17 @@
     <div class="list-hd">
       <div class="list-hd-top">
         <span class="list-title" id="list-title">すべての文献</span>
-        <button class="btn-add" onclick="openAddModal()">＋ 追加</button>
+        <button class="btn-add" type="button" data-action="open-add-modal">＋ 追加</button>
       </div>
       <div class="search-wrap">
         <span class="si">🔍</span>
-        <input type="text" id="srch" placeholder="タイトル・著者・キーワードで検索..." oninput="onSearch(this.value)">
+        <input type="text" id="srch" placeholder="タイトル・著者・キーワードで検索...">
       </div>
       <div class="filter-row">
-        <select id="fa" title="著者フィルタ" onchange="onFilter('author',this.value)"><option value="">著者…</option></select>
-        <select id="fy" title="年フィルタ" onchange="onFilter('year',this.value)"><option value="">年…</option></select>
-        <select id="fj" title="誌名フィルタ" onchange="onFilter('journal',this.value)"><option value="">誌名…</option></select>
-        <select id="sort" title="並び替え" onchange="onSort(this.value)">
+        <select id="fa" title="著者フィルタ"><option value="">著者…</option></select>
+        <select id="fy" title="年フィルタ"><option value="">年…</option></select>
+        <select id="fj" title="誌名フィルタ"><option value="">誌名…</option></select>
+        <select id="sort" title="並び替え">
           <option value="addedAt">追加順</option>
           <option value="year">年</option>
           <option value="title">タイトル</option>
@@ -578,18 +578,18 @@
   <div class="modal-box">
     <div class="modal-hd">
       <span class="modal-hd-title" id="modal-hd-title">文献を追加</span>
-      <button class="modal-x" onclick="closeModal('add-modal')">✕</button>
+      <button class="modal-x" type="button" data-action="close-modal" data-modal="add-modal">✕</button>
     </div>
     <div class="modal-tabs" id="modal-tabs">
-      <button class="m-tab on" onclick="switchTab('doi')">DOI / arXiv</button>
-      <button class="m-tab"   onclick="switchTab('bibtex')">BibTeX</button>
-      <button class="m-tab"   onclick="switchTab('manual')">手動入力</button>
-      <button class="m-tab"   onclick="switchTab('pdf')">PDF</button>
+      <button class="m-tab on" type="button" data-action="switch-tab" data-tab="doi">DOI / arXiv</button>
+      <button class="m-tab" type="button" data-action="switch-tab" data-tab="bibtex">BibTeX</button>
+      <button class="m-tab" type="button" data-action="switch-tab" data-tab="manual">手動入力</button>
+      <button class="m-tab" type="button" data-action="switch-tab" data-tab="pdf">PDF</button>
     </div>
     <div class="modal-body" id="modal-body"></div>
     <div class="modal-ft">
-      <button class="btn-sec" onclick="closeModal('add-modal')">キャンセル</button>
-      <button class="btn-add" id="modal-save" onclick="saveModal()">追加</button>
+      <button class="btn-sec" type="button" data-action="close-modal" data-modal="add-modal">キャンセル</button>
+      <button class="btn-add" id="modal-save" type="button" data-action="save-modal">追加</button>
     </div>
   </div>
 </div>
@@ -599,26 +599,38 @@
   <div class="modal-box">
     <div class="modal-hd">
       <span class="modal-hd-title">BibTeX 出力</span>
-      <button class="modal-x" onclick="closeModal('bib-modal')">✕</button>
+      <button class="modal-x" type="button" data-action="close-modal" data-modal="bib-modal">✕</button>
     </div>
     <div class="modal-body"><pre class="bib-out" id="bib-out"></pre></div>
     <div class="modal-ft">
-      <button class="btn-sec" onclick="cpBib()">📋 コピー</button>
-      <button class="btn-sec" onclick="dlBib()">⬇ ダウンロード</button>
-      <button class="btn-sec" onclick="closeModal('bib-modal')">閉じる</button>
+      <button class="btn-sec" type="button" data-action="copy-bib">📋 コピー</button>
+      <button class="btn-sec" type="button" data-action="download-bib">⬇ ダウンロード</button>
+      <button class="btn-sec" type="button" data-action="close-modal" data-modal="bib-modal">閉じる</button>
     </div>
   </div>
 </div>
 
-<input type="file" id="pdf-attach-global" accept=".pdf,application/pdf" style="display:none" onchange="handleExistingPaperPdf(this)">
-<input type="file" id="supp-attach-global" multiple style="display:none" onchange="handleExistingPaperSupplement(this)">
+<input type="file" id="pdf-attach-global" accept=".pdf,application/pdf" style="display:none">
+<input type="file" id="supp-attach-global" multiple style="display:none">
 <div class="toast" id="toast"></div>
 
 <script>
-// PDF.js worker
-if (typeof pdfjsLib !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDFJS_MODULE_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.mjs';
+const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.worker.min.mjs';
+let pdfjsModulePromise = null;
+
+async function getPdfJsLib() {
+  if (!pdfjsModulePromise) {
+    pdfjsModulePromise = import(PDFJS_MODULE_URL).then(mod => {
+      const lib = mod.default || mod;
+      lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+      return lib;
+    }).catch(err => {
+      pdfjsModulePromise = null;
+      throw err;
+    });
+  }
+  return pdfjsModulePromise;
 }
 
 /* ============================================================
@@ -663,45 +675,118 @@ let M = {
 /* ============================================================
    STORAGE
 ============================================================ */
-function normalizePaper(p) {
+const SAFE_PAPER_TYPES = new Set(['article', 'inproceedings', 'preprint', 'book', 'misc', 'phdthesis', 'mastersthesis']);
+const SAFE_READ_STATUS = new Set(['unread', 'reading', 'read']);
+const SAFE_URL_PROTOCOLS = new Set(['https:', 'http:']);
+
+function sanitizeText(value, maxLen = 5000) {
+  if (value == null) return '';
+  return String(value).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, maxLen);
+}
+
+function sanitizeId(value) {
+  const cleaned = sanitizeText(value, 120).replace(/[^A-Za-z0-9:_-]/g, '');
+  return cleaned || uid();
+}
+
+function normalizeYear(value) {
+  const n = parseInt(value, 10);
+  return Number.isInteger(n) && n >= 1000 && n <= 3000 ? n : null;
+}
+
+function normalizeCount(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null;
+}
+
+function normalizeType(value) {
+  return SAFE_PAPER_TYPES.has(value) ? value : 'article';
+}
+
+function normalizeReadStatus(value) {
+  return SAFE_READ_STATUS.has(value) ? value : 'unread';
+}
+
+function sanitizeStringArray(values, maxItems = 50, maxLen = 160) {
+  if (!Array.isArray(values)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const value of values) {
+    const item = sanitizeText(value, maxLen);
+    if (!item || seen.has(item)) continue;
+    seen.add(item);
+    out.push(item);
+    if (out.length >= maxItems) break;
+  }
+  return out;
+}
+
+function sanitizeExternalUrl(raw) {
+  const value = sanitizeText(raw, 2048);
+  if (!value) return '';
+  try {
+    const url = new URL(value, window.location.href);
+    if (!SAFE_URL_PROTOCOLS.has(url.protocol)) return '';
+    return url.href;
+  } catch (_) {
+    return '';
+  }
+}
+
+function sanitizeRelativePath(raw) {
+  const value = sanitizeText(raw, 240).replace(/\\/g, '/');
+  if (!value || value.startsWith('/') || value.includes('..')) return '';
+  return /^[A-Za-z0-9._\/-]+$/.test(value) ? value : '';
+}
+
+function normalizeCollection(value) {
   return {
-    id: p.id || uid(),
-    type: p.type || 'article',
-    bibtexKey: p.bibtexKey || '',
-    title: p.title || '',
-    authors: Array.isArray(p.authors) ? p.authors : [],
-    year: p.year || null,
-    journal: p.journal || '',
-    volume: p.volume || '',
-    number: p.number || '',
-    pages: p.pages || '',
-    publisher: p.publisher || '',
-    doi: p.doi || '',
-    arxivId: p.arxivId || '',
-    url: p.url || '',
-    abstract: p.abstract || '',
-    citationCount: p.citationCount ?? null,
-    tags: Array.isArray(p.tags) ? p.tags : [],
-    collections: Array.isArray(p.collections) ? p.collections : [],
-    starred: !!p.starred,
-    readStatus: p.readStatus || 'unread',
-    notes: p.notes || '',
-    addedAt: p.addedAt || new Date().toISOString(),
-    pdfId: p.pdfId || '',
-    pdfName: p.pdfName || '',
-    pdfOriginalName: p.pdfOriginalName || '',
-    pdfPath: p.pdfPath || '',
-    hasPdf: !!p.hasPdf,
-    supplementalFiles: Array.isArray(p.supplementalFiles)
-      ? p.supplementalFiles.map((f, idx) => ({
-          id: f.id || uid(),
-          name: f.name || '',
-          originalName: f.originalName || f.name || '',
-          path: f.path || '',
-          type: f.type || 'application/octet-stream',
-          size: f.size || 0,
-          updatedAt: f.updatedAt || new Date().toISOString(),
-          slot: Number.isFinite(f.slot) ? f.slot : (idx + 1)
+    id: sanitizeId(value?.id),
+    name: sanitizeText(value?.name, 80) || 'Untitled'
+  };
+}
+
+function normalizePaper(p) {
+  const safeId = sanitizeId(p?.id);
+  const safePdfId = p?.pdfId ? sanitizeId(p.pdfId) : safeId;
+  return {
+    id: safeId,
+    type: normalizeType(p?.type),
+    bibtexKey: sanitizeText(p?.bibtexKey, 120),
+    title: sanitizeText(p?.title, 500),
+    authors: sanitizeStringArray(Array.isArray(p?.authors) ? p.authors : [], 40, 160),
+    year: normalizeYear(p?.year),
+    journal: sanitizeText(p?.journal, 240),
+    volume: sanitizeText(p?.volume, 40),
+    number: sanitizeText(p?.number, 40),
+    pages: sanitizeText(p?.pages, 60),
+    publisher: sanitizeText(p?.publisher, 240),
+    doi: sanitizeText(p?.doi, 256),
+    arxivId: sanitizeText(p?.arxivId, 128),
+    url: sanitizeExternalUrl(p?.url),
+    abstract: sanitizeText(p?.abstract, 12000),
+    citationCount: normalizeCount(p?.citationCount),
+    tags: sanitizeStringArray(Array.isArray(p?.tags) ? p.tags : [], 60, 40),
+    collections: sanitizeStringArray(Array.isArray(p?.collections) ? p.collections : [], 10, 120),
+    starred: !!p?.starred,
+    readStatus: normalizeReadStatus(p?.readStatus),
+    notes: sanitizeText(p?.notes, 12000),
+    addedAt: sanitizeText(p?.addedAt, 40) || new Date().toISOString(),
+    pdfId: safePdfId,
+    pdfName: sanitizeText(p?.pdfName, 200),
+    pdfOriginalName: sanitizeText(p?.pdfOriginalName, 200),
+    pdfPath: sanitizeRelativePath(p?.pdfPath),
+    hasPdf: !!p?.hasPdf,
+    supplementalFiles: Array.isArray(p?.supplementalFiles)
+      ? p.supplementalFiles.slice(0, 50).map((f, idx) => ({
+          id: sanitizeId(f?.id),
+          name: sanitizeText(f?.name, 200),
+          originalName: sanitizeText(f?.originalName || f?.name, 200),
+          path: sanitizeRelativePath(f?.path),
+          type: sanitizeText(f?.type, 120) || 'application/octet-stream',
+          size: Math.max(0, Number(f?.size) || 0),
+          updatedAt: sanitizeText(f?.updatedAt, 40) || new Date().toISOString(),
+          slot: Number.isFinite(f?.slot) ? f.slot : (idx + 1)
         }))
       : []
   };
@@ -710,7 +795,7 @@ function normalizePaper(p) {
 function load() {
   try {
     const d = localStorage.getItem('bunken_v1');
-    if (d) { const p = JSON.parse(d); S.papers = (p.papers||[]).map(normalizePaper); S.collections = p.collections||[]; }
+    if (d) { const p = JSON.parse(d); S.papers = (p.papers||[]).map(normalizePaper); S.collections = Array.isArray(p.collections) ? p.collections.map(normalizeCollection) : []; }
   } catch(e) {}
 }
 function save() {
@@ -1217,7 +1302,7 @@ async function importDataFromFolder(handle, opts = {}) {
   }
 
   const importedPapers = data.papers.map(normalizePaper);
-  const importedCollections = Array.isArray(data.collections) ? data.collections : [];
+  const importedCollections = Array.isArray(data.collections) ? data.collections.map(normalizeCollection) : [];
 
   for (const paper of importedPapers) {
     if (paper.hasPdf && paper.pdfId && paper.pdfPath) {
@@ -1411,7 +1496,7 @@ function richInline(s) {
   return tpl.innerHTML;
 }
 
-// For use in onclick='...' attribute values — escape single quotes
+// For use in data attributes — escape single quotes
 function oa(s) { return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 
 function sanitizeFilePart(s) {
@@ -1487,6 +1572,18 @@ function toast(msg) {
   el.textContent = msg; el.classList.add('on');
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.remove('on'), 2600);
+}
+
+function safeDoiUrl(doi) {
+  const cleaned = sanitizeText(doi, 256);
+  if (!cleaned) return '';
+  return `https://doi.org/${encodeURIComponent(cleaned).replace(/%2F/g, '/')}`;
+}
+
+function safeArxivUrl(arxivId) {
+  const cleaned = sanitizeText(arxivId, 128).replace(/\s+/g, '');
+  if (!cleaned) return '';
+  return `https://arxiv.org/abs/${encodeURIComponent(cleaned).replace(/%2F/g, '/')}`;
 }
 
 /* ============================================================
@@ -1618,9 +1715,9 @@ async function fetchArxiv(raw) {
    PDF METADATA
 ============================================================ */
 async function extractPDF(file) {
-  if (typeof pdfjsLib === 'undefined') throw new Error('PDF.jsが読み込まれていません');
+  const pdfJs = await getPdfJsLib();
   const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const pdf = await pdfJs.getDocument({ data: buf }).promise;
   const meta = await pdf.getMetadata();
   let title = meta.info?.Title || '';
   let author = meta.info?.Author || '';
@@ -1637,7 +1734,7 @@ async function extractPDF(file) {
     title = best;
   }
   const authors = author ? author.split(/[,;]/).map(a=>a.trim()).filter(Boolean) : [];
-  return {
+  return normalizePaper({
     id: uid(), type: 'article', bibtexKey: '', title, authors,
     year: null, journal:'', volume:'', number:'', pages:'', publisher:'',
     doi:'', arxivId:'', url:'', abstract:'', citationCount: null,
@@ -1645,12 +1742,8 @@ async function extractPDF(file) {
     addedAt: new Date().toISOString(),
     pdfId: '', pdfName: file.name || '', pdfOriginalName: file.name || '', pdfPath: '', hasPdf: false,
     supplementalFiles: []
-  };
+  });
 }
-
-/* ============================================================
-   FILTER / SORT
-============================================================ */
 function filtered() {
   let pp = [...S.papers];
   if (S.view === 'starred')        pp = pp.filter(p => p.starred);
@@ -1706,9 +1799,9 @@ function renderSidebar() {
   const tagCounts = {};
   S.papers.forEach(p => (p.tags||[]).forEach(t => { tagCounts[t]=(tagCounts[t]||0)+1; }));
 
-  const item = (view, ico, lbl, cnt, xtra='') => {
+  const item = (view, ico, lbl, cnt) => {
     const a = S.view===view?'active':'';
-    return `<div class="side-item ${a}" onclick="setView('${oa(view)}')" ${xtra}>
+    return `<div class="side-item ${a}" data-action="set-view" data-view="${h(view)}">
       <span class="ico">${ico}</span><span class="lbl">${h(lbl)}</span><span class="cnt">${cnt}</span></div>`;
   };
 
@@ -1731,11 +1824,11 @@ function renderSidebar() {
       <div class="side-storage">
         <div class="side-storage-name">${h(storageName)}</div>
         <div class="side-storage-status">${storageStatus}</div>
-        ${STORAGE_STATE.available ? `<div class="side-btn-row"><button class="side-btn" onclick="chooseStorageFolder()">📂 保存先フォルダを選択</button></div>
-        <div class="side-btn-row"><button class="side-btn" onclick="toggleRealtimeSync()">${STORAGE_STATE.realtimeSync ? '🟢 リアルタイム同期 ON' : '⚪ リアルタイム同期 OFF'}</button></div>
-        ${STORAGE_STATE.folderHandle ? `<div class="side-btn-row"><button class="side-btn side-btn-flex" onclick="importDataFromChosenFolderPrompt()"><span class="side-btn-label">📥 保存先から読み込む</span>${remoteBadge ? `<span class="diff-chip diff-remote" title="他のデバイスでの変更: ${h(remoteBadge)}">${h(remoteBadge)}</span>` : ''}</button></div>
-        <div class="side-btn-row"><button class="side-btn side-btn-flex" onclick="syncAllDataToChosenFolder(true)"><span class="side-btn-label">💾 保存先へ書き出し</span>${localBadge ? `<span class="diff-chip diff-local" title="このブラウザで未同期の変更: ${h(localBadge)}">${h(localBadge)}</span>` : ''}</button></div>
-        <div class="side-btn-row"><button class="side-btn" onclick="clearStorageFolder()">↩ ブラウザ保存に戻す</button></div>` : ''}` : ''}
+        ${STORAGE_STATE.available ? `<div class="side-btn-row"><button class="side-btn" type="button" data-action="choose-storage-folder">📂 保存先フォルダを選択</button></div>
+        <div class="side-btn-row"><button class="side-btn" type="button" data-action="toggle-realtime-sync">${STORAGE_STATE.realtimeSync ? '🟢 リアルタイム同期 ON' : '⚪ リアルタイム同期 OFF'}</button></div>
+        ${STORAGE_STATE.folderHandle ? `<div class="side-btn-row"><button class="side-btn side-btn-flex" type="button" data-action="import-from-folder"><span class="side-btn-label">📥 保存先から読み込む</span>${remoteBadge ? `<span class="diff-chip diff-remote" title="他のデバイスでの変更: ${h(remoteBadge)}">${h(remoteBadge)}</span>` : ''}</button></div>
+        <div class="side-btn-row"><button class="side-btn side-btn-flex" type="button" data-action="sync-to-folder"><span class="side-btn-label">💾 保存先へ書き出し</span>${localBadge ? `<span class="diff-chip diff-local" title="このブラウザで未同期の変更: ${h(localBadge)}">${h(localBadge)}</span>` : ''}</button></div>
+        <div class="side-btn-row"><button class="side-btn" type="button" data-action="clear-storage-folder">↩ ブラウザ保存に戻す</button></div>` : ''}` : ''}
       </div>
     </div>
     <div class="side-sec">
@@ -1746,11 +1839,11 @@ function renderSidebar() {
       ${item('read','✓','読了',rd)}
     </div>
     <div class="side-sec">
-      <div class="side-sec-hd">コレクション<button onclick="addCollection()" title="コレクション追加">＋</button></div>
+      <div class="side-sec-hd">コレクション<button type="button" data-action="add-collection" title="コレクション追加">＋</button></div>
       ${S.collections.map(c => {
         const cc = S.papers.filter(p=>(p.collections||[]).includes(c.id)).length;
         const a = S.view==='col:'+c.id?'active':'';
-        return `<div class="side-item ${a}" onclick="setView('col:${oa(c.id)}')">
+        return `<div class="side-item ${a}" data-action="set-view" data-view="${h(`col:${c.id}`)}">
           <span class="ico">📁</span><span class="lbl">${h(c.name)}</span><span class="cnt">${cc}</span></div>`;
       }).join('')}
       ${!S.collections.length?'<div class="side-empty">なし</div>':''}
@@ -1759,7 +1852,7 @@ function renderSidebar() {
       <div class="side-sec-hd">タグ</div>
       ${Object.entries(tagCounts).sort((a,b)=>b[1]-a[1]).map(([t,c]) => {
         const a = S.view==='tag:'+t?'active':'';
-        return `<div class="side-item ${a}" onclick="setView('tag:${oa(t)}')">
+        return `<div class="side-item ${a}" data-action="set-view" data-view="${h(`tag:${t}`)}">
           <span class="ico" style="color:var(--tag-fg);opacity:1;font-size:10px;">#</span>
           <span class="lbl">${h(t)}</span><span class="cnt">${c}</span></div>`;
       }).join('')}
@@ -1767,7 +1860,6 @@ function renderSidebar() {
     </div>`;
   document.getElementById('sidebar').innerHTML = html;
 }
-
 function renderList() {
   const pp = filtered();
   const labels = { all:'すべての文献', starred:'スター付き', unread:'未読', reading:'読書中', read:'読了' };
@@ -1793,9 +1885,9 @@ function renderList() {
     const tags = (p.tags||[]).slice(0,3).map(t=>`<span class="tag-pill">${h(t)}</span>`).join('');
     const cit = p.citationCount!=null ? `<span class="pi-cit">被引用 ${p.citationCount}</span>` : '';
     const sel = S.selectedId===p.id?'sel':'';
-    return `<div class="paper-item ${sel}" onclick="selectPaper('${p.id}')">
+    return `<div class="paper-item ${sel}" data-action="select-paper" data-id="${h(p.id)}">
       <div class="pi-top">
-        <button class="pi-star ${p.starred?'on':''}" onclick="event.stopPropagation();toggleStar('${p.id}')">${p.starred?'★':'☆'}</button>
+        <button type="button" class="pi-star ${p.starred?'on':''}" data-action="toggle-star" data-id="${h(p.id)}">${p.starred?'★':'☆'}</button>
         <div class="pi-title">${richInline(p.title||'（タイトルなし）')}</div>
         <div class="pi-year">${p.year||'—'}</div>
       </div>
@@ -1804,7 +1896,6 @@ function renderList() {
     </div>`;
   }).join('');
 }
-
 function renderDetail() {
   const pane = document.getElementById('detail-pane');
   if (!S.selectedId) {
@@ -1818,31 +1909,34 @@ function renderDetail() {
   const auStr = (p.authors||[]).join(', ') || '—';
   const venParts = [p.journal, p.volume?`vol.${p.volume}`:'', p.number?`no.${p.number}`:'', p.pages].filter(Boolean);
   const ven = venParts.join(' · ');
+  const doiUrl = safeDoiUrl(p.doi);
+  const arxivUrl = safeArxivUrl(p.arxivId);
+  const customUrl = p.url && !p.doi && !p.arxivId ? sanitizeExternalUrl(p.url) : '';
 
   const links = [
-    p.doi ? `<a class="d-link" href="https://doi.org/${h(p.doi)}" target="_blank">DOI</a>` : '',
-    p.arxivId ? `<a class="d-link" href="https://arxiv.org/abs/${h(p.arxivId)}" target="_blank">arXiv</a>` : '',
-    p.url && !p.doi && !p.arxivId ? `<a class="d-link" href="${h(p.url)}" target="_blank">URL</a>` : '',
-    p.hasPdf ? `<a class="d-link" href="#" onclick="event.preventDefault();openStoredPdf('${p.id}')">PDF を開く</a>` : ''
+    doiUrl ? `<a class="d-link" href="${h(doiUrl)}" target="_blank" rel="noopener noreferrer">DOI</a>` : '',
+    arxivUrl ? `<a class="d-link" href="${h(arxivUrl)}" target="_blank" rel="noopener noreferrer">arXiv</a>` : '',
+    customUrl ? `<a class="d-link" href="${h(customUrl)}" target="_blank" rel="noopener noreferrer">URL</a>` : '',
+    p.hasPdf ? `<a class="d-link" href="#" data-action="open-pdf" data-id="${h(p.id)}">PDF を開く</a>` : ''
   ].filter(Boolean).join('');
 
   const colOpts = `<option value="">—</option>` +
-    S.collections.map(c=>`<option value="${c.id}" ${(p.collections||[]).includes(c.id)?'selected':''}>${h(c.name)}</option>`).join('');
+    S.collections.map(c=>`<option value="${h(c.id)}" ${(p.collections||[]).includes(c.id)?'selected':''}>${h(c.name)}</option>`).join('');
 
   const tagsHtml = (p.tags||[]).map(t =>
-    `<span class="tag-edit">${h(t)}<button data-id="${p.id}" data-tag="${h(t)}" onclick="rmTagBtn(this)">✕</button></span>`
+    `<span class="tag-edit">${h(t)}<button type="button" data-action="remove-tag" data-id="${h(p.id)}" data-tag="${h(t)}">✕</button></span>`
   ).join('');
 
   const sbtn = (s, lbl) => {
     const a = p.readStatus===s ? `on-${s}` : '';
-    return `<button class="s-btn ${a}" onclick="setStatus('${p.id}','${s}')">${lbl}</button>`;
+    return `<button type="button" class="s-btn ${a}" data-action="set-status" data-id="${h(p.id)}" data-status="${s}">${lbl}</button>`;
   };
 
   const cit = p.citationCount!=null
     ? `<div class="d-cit"><strong>${p.citationCount}</strong> 被引用数</div>` : '';
 
   pane.innerHTML = `<div class="detail-wrap">
-    <button class="d-star ${p.starred?'on':''}" onclick="toggleStar('${p.id}')">${p.starred?'★':'☆'}</button>
+    <button type="button" class="d-star ${p.starred?'on':''}" data-action="toggle-star" data-id="${h(p.id)}">${p.starred?'★':'☆'}</button>
     <div class="d-type">${typeLabels[p.type]||p.type||'—'}</div>
     <div class="d-title">${richInline(p.title||'（タイトルなし）')}</div>
     <div class="d-authors">${h(auStr)}</div>
@@ -1855,14 +1949,12 @@ function renderDetail() {
       <hr class="d-div">
       <div class="d-sh">Abstract</div>
       <div class="d-abstract ${S.absExpanded?'':'coll'}" id="d-abs">${h(p.abstract)}</div>
-      <button class="expand-btn" onclick="toggleAbs()">${S.absExpanded?'折りたたむ ▲':'続きを表示 ▼'}</button>
+      <button type="button" class="expand-btn" data-action="toggle-abstract">${S.absExpanded?'折りたたむ ▲':'続きを表示 ▼'}</button>
     `:''}
     <hr class="d-div">
     <div class="d-sh">タグ</div>
     <div class="tags-row">${tagsHtml}
-      <input class="tag-in" id="tag-in" placeholder="追加して Enter…"
-        onkeydown="tagKeydown(event,'${p.id}')"
-        onblur="tagBlur(this,'${p.id}')">
+      <input class="tag-in" id="tag-in" data-action="tag-input" data-id="${h(p.id)}" placeholder="追加して Enter…">
     </div>
     <hr class="d-div">
     <div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;">
@@ -1872,32 +1964,31 @@ function renderDetail() {
       </div>
       ${S.collections.length?`<div>
         <div class="d-sh" style="margin-bottom:6px;">コレクション</div>
-        <select class="col-select" onchange="setCol('${p.id}',this.value)">${colOpts}</select>
+        <select class="col-select" data-action="set-collection" data-id="${h(p.id)}">${colOpts}</select>
       </div>`:''}
     </div>
     <hr class="d-div">
     <div class="d-sh">PDF / 添付ファイル</div>
     <div class="d-actions">
-      <button class="btn-sec" onclick="promptAttachPdf('${p.id}')">${p.hasPdf?'🔁 PDFを差し替え':'📎 PDFを添付'}</button>
-      ${p.hasPdf?`<button class="btn-sec" onclick="openStoredPdf('${p.id}')">📄 PDFを開く</button><button class="btn-del" onclick="removeAttachedPdf('${p.id}')">PDFを外す</button>`:''}
+      <button type="button" class="btn-sec" data-action="prompt-attach-pdf" data-id="${h(p.id)}">${p.hasPdf?'🔁 PDFを差し替え':'📎 PDFを添付'}</button>
+      ${p.hasPdf?`<button type="button" class="btn-sec" data-action="open-pdf" data-id="${h(p.id)}">📄 PDFを開く</button><button type="button" class="btn-del" data-action="remove-pdf" data-id="${h(p.id)}">PDFを外す</button>`:''}
     </div>
     <div class="d-sh" style="margin-top:14px;">Supplemental materials</div>
-    ${(p.supplementalFiles||[]).length ? `<div class="d-links">${(p.supplementalFiles||[]).map(f => `<a class="d-link" href="#" onclick="event.preventDefault();openStoredSupplement('${p.id}','${f.id}')">${h(f.name)}</a>${f.path?`<span class="d-link" style="pointer-events:none;">${h(f.path)}</span>`:''}<a class="d-link" href="#" onclick="event.preventDefault();removeSupplement('${p.id}','${f.id}')">削除</a>`).join('')}</div>` : `<div class="d-venue">補足資料: なし</div>`}
+    ${(p.supplementalFiles||[]).length ? `<div class="d-links">${(p.supplementalFiles||[]).map(f => `<a class="d-link" href="#" data-action="open-supplement" data-id="${h(p.id)}" data-file-id="${h(f.id)}">${h(f.name)}</a>${f.path?`<span class="d-link" style="pointer-events:none;">${h(f.path)}</span>`:''}<a class="d-link" href="#" data-action="remove-supplement" data-id="${h(p.id)}" data-file-id="${h(f.id)}">削除</a>`).join('')}</div>` : `<div class="d-venue">補足資料: なし</div>`}
     <div class="d-actions">
-      <button class="btn-sec" onclick="promptAttachSupplement('${p.id}')">📎 補足資料を追加</button>
+      <button type="button" class="btn-sec" data-action="prompt-attach-supplement" data-id="${h(p.id)}">📎 補足資料を追加</button>
     </div>
     <hr class="d-div">
     <div class="d-sh">メモ・ノート</div>
-    <textarea class="notes-ta" placeholder="メモを入力…" onchange="updNotes('${p.id}',this.value)">${h(p.notes||'')}</textarea>
+    <textarea class="notes-ta" data-action="notes-change" data-id="${h(p.id)}" placeholder="メモを入力…">${h(p.notes||'')}</textarea>
     <hr class="d-div">
     <div class="d-actions">
-      <button class="btn-sec" onclick="openEditModal('${p.id}')">✏ 編集</button>
-      <button class="btn-sec" onclick="showBib('${p.id}')">{ } BibTeX</button>
-      <button class="btn-del" onclick="delPaper('${p.id}')">🗑 削除</button>
+      <button type="button" class="btn-sec" data-action="open-edit-modal" data-id="${h(p.id)}">✏ 編集</button>
+      <button type="button" class="btn-sec" data-action="show-bib" data-id="${h(p.id)}">{ } BibTeX</button>
+      <button type="button" class="btn-del" data-action="delete-paper" data-id="${h(p.id)}">🗑 削除</button>
     </div>
   </div>`;
 }
-
 function updateFilters() {
   const set = fn => { const s = new Set(); S.papers.forEach(fn(s)); return s; };
   const authors = new Set(); S.papers.forEach(p=>(p.authors||[]).forEach(a=>authors.add(a.split(',')[0].trim())));
@@ -1948,7 +2039,7 @@ async function delPaper(id) {
   if (!confirm('この文献を削除しますか？')) return;
   const paper = S.papers.find(p=>p.id===id);
   if (paper?.hasPdf) {
-    try { await deletePdfBlob(id); } catch(e) { console.error(e); }
+    try { await deletePdfBlob(paper.pdfId || id); } catch(e) { console.error(e); }
     if (STORAGE_STATE.folderHandle && paper.pdfPath) { try { await removeRelativePath(STORAGE_STATE.folderHandle, paper.pdfPath); } catch(e) { console.error(e); } }
   }
   for (const fileMeta of (paper?.supplementalFiles || [])) {
@@ -1962,7 +2053,7 @@ async function delPaper(id) {
 
 function addCollection() {
   const name = prompt('コレクション名:');
-  if (name && name.trim()) { S.collections.push({id:uid(),name:name.trim()}); save(); render(); }
+  if (name && name.trim()) { S.collections.push(normalizeCollection({id:uid(),name:name.trim()})); save(); render(); }
 }
 
 function onSearch(q)       { S.filters.search=q;  renderList(); }
@@ -1995,8 +2086,9 @@ async function attachPdfToPaper(id, file) {
   try {
     let extracted = null;
     try { extracted = await extractPDF(file); } catch (e) { console.warn(e); }
-    await putPdfBlob(id, file);
-    paper.pdfId = id;
+    const pdfBlobId = paper.pdfId || id;
+    await putPdfBlob(pdfBlobId, file);
+    paper.pdfId = pdfBlobId;
     paper.pdfOriginalName = file.name || 'document.pdf';
     paper.hasPdf = true;
     if (!plainText(paper.title) && extracted?.title) paper.title = extracted.title;
@@ -2017,7 +2109,7 @@ async function removeAttachedPdf(id) {
   if (!paper || !paper.hasPdf) return;
   if (!confirm('添付PDFを外しますか？')) return;
   try {
-    await deletePdfBlob(id);
+    await deletePdfBlob(paper.pdfId || id);
     if (STORAGE_STATE.folderHandle && paper.pdfPath) { try { await removeRelativePath(STORAGE_STATE.folderHandle, paper.pdfPath); } catch (e) { console.error(e); } }
     paper.pdfId = '';
     paper.pdfName = '';
@@ -2106,7 +2198,8 @@ async function removeSupplement(paperId, fileId) {
 
 async function openStoredPdf(id) {
   try {
-    const rec = await getPdfBlob(id);
+    const paper = S.papers.find(p => p.id === id);
+    const rec = await getPdfBlob(paper?.pdfId || id);
     if (!rec?.blob) { toast('保存済みの PDF が見つかりません'); return; }
     const url = URL.createObjectURL(rec.blob);
     window.open(url, '_blank', 'noopener');
@@ -2173,8 +2266,8 @@ function renderModalBody() {
       <div class="fg">
         <label class="fl">DOI または arXiv ID</label>
         <div class="fetch-row">
-          <input class="fi" id="doi-in" placeholder="例: 10.1021/jacs.0c00000 または 2301.12345" onkeydown="if(event.key==='Enter')doFetch()">
-          <button class="btn-fetch" id="fetch-btn" onclick="doFetch()">🔍 取得</button>
+          <input class="fi" id="doi-in" placeholder="例: 10.1021/jacs.0c00000 または 2301.12345">
+          <button class="btn-fetch" type="button" id="fetch-btn" data-action="do-fetch">🔍 取得</button>
         </div>
         <div class="fs" id="fetch-st"></div>
         <div class="preview" id="fetch-pv"></div>
@@ -2183,9 +2276,11 @@ function renderModalBody() {
     el.innerHTML = `
       <div class="fg">
         <label class="fl">BibTeX を貼り付け</label>
-        <textarea class="bta" id="bib-in" placeholder="@article{key,\n  title = {Title},\n  ..."></textarea>
+        <textarea class="bta" id="bib-in" placeholder="@article{key,
+  title = {Title},
+  ..."></textarea>
       </div>
-      <button class="btn-fetch" style="width:100%;justify-content:center;" onclick="doParseBib()">解析する</button>
+      <button class="btn-fetch" type="button" style="width:100%;justify-content:center;" data-action="parse-bib">解析する</button>
       <div class="fs" id="bib-st"></div>
       <div class="preview" id="bib-pv"></div>`;
   } else if (M.tab==='manual') {
@@ -2221,19 +2316,14 @@ function renderModalBody() {
     `;
   } else if (M.tab==='pdf') {
     el.innerHTML = `
-      <div class="drop-area" id="pdf-drop"
-        onclick="document.getElementById('pdf-in').click()"
-        ondragover="event.preventDefault();this.classList.add('dov')"
-        ondragleave="this.classList.remove('dov')"
-        ondrop="event.preventDefault();this.classList.remove('dov');handlePDF(event.dataTransfer.files[0])">
+      <div class="drop-area" id="pdf-drop" data-action="trigger-pdf-input">
         <span class="di">📄</span>PDFをドラッグ＆ドロップ<br>またはクリックして選択
-        <input type="file" id="pdf-in" accept=".pdf" style="display:none" onchange="handlePDF(this.files[0])">
+        <input type="file" id="pdf-in" accept=".pdf,application/pdf" style="display:none">
       </div>
       <div class="fs" id="pdf-st"></div>
       <div class="preview" id="pdf-pv"></div>`;
   }
 }
-
 async function doFetch() {
   const val = document.getElementById('doi-in').value.trim();
   if (!val) return;
@@ -2242,7 +2332,7 @@ async function doFetch() {
   st.textContent=''; st.className='fs'; pv.classList.remove('on');
   try {
     const isArxiv = /^\d{4}\.\d+/.test(val) || /^[a-z\-]+\/\d/.test(val) || val.includes('arxiv');
-    const paper = isArxiv ? await fetchArxiv(val) : await fetchDOI(val);
+    const paper = normalizePaper(isArxiv ? await fetchArxiv(val) : await fetchDOI(val));
     M.pending = paper;
     st.textContent='✓ 取得成功！'; st.className='fs ok';
     pv.classList.add('on');
@@ -2254,7 +2344,8 @@ async function doFetch() {
 function doParseBib() {
   const txt=document.getElementById('bib-in').value;
   const st=document.getElementById('bib-st'), pv=document.getElementById('bib-pv');
-  const paper=parseBib(txt);
+  const parsed=parseBib(txt);
+  const paper=parsed ? normalizePaper(parsed) : null;
   if (!paper) { st.textContent='✕ BibTeXの解析に失敗しました'; st.className='fs err'; return; }
   M.pending=paper; st.textContent='✓ 解析成功！'; st.className='fs ok';
   pv.classList.add('on');
@@ -2278,7 +2369,7 @@ async function handlePDF(file) {
 
 function readManualForm(existingId) {
   const orig = existingId ? S.papers.find(p=>p.id===existingId) : {};
-  return {
+  return normalizePaper({
     id: existingId || uid(),
     type: document.getElementById('m-type').value,
     title: document.getElementById('m-title').value.trim(),
@@ -2302,9 +2393,8 @@ function readManualForm(existingId) {
     pdfOriginalName: orig.pdfOriginalName||'',
     pdfPath: orig.pdfPath||'',
     supplementalFiles: orig.supplementalFiles||[]
-  };
+  });
 }
-
 async function saveModal() {
   let paper = null;
   if (M.tab==='manual' || M.editId) {
@@ -2319,9 +2409,9 @@ async function saveModal() {
   }
   if (!paper.bibtexKey) paper.bibtexKey = bKey(paper);
   if (paper._pdfFile) {
-    paper.pdfId = paper.id;
+    paper.pdfId = paper.pdfId || paper.id;
     try {
-      await putPdfBlob(paper.id, paper._pdfFile);
+      await putPdfBlob(paper.pdfId || paper.id, paper._pdfFile);
       paper.hasPdf = true;
     } catch (e) {
       console.error(e);
@@ -2369,15 +2459,134 @@ function dlBib() {
 }
 
 /* ============================================================
-   KEYBOARD & CLICK-OUTSIDE
+   EVENTS
 ============================================================ */
+document.addEventListener('click', async (event) => {
+  const actionEl = event.target.closest('[data-action]');
+  if (!actionEl) return;
+  const action = actionEl.dataset.action;
+  const id = actionEl.dataset.id || '';
+  const fileId = actionEl.dataset.fileId || '';
+  const view = actionEl.dataset.view || '';
+  const modal = actionEl.dataset.modal || '';
+  const tab = actionEl.dataset.tab || '';
+  const status = actionEl.dataset.status || '';
+  try {
+    switch (action) {
+      case 'open-add-modal': openAddModal(); break;
+      case 'close-modal': closeModal(modal); break;
+      case 'switch-tab': switchTab(tab); break;
+      case 'save-modal': await saveModal(); break;
+      case 'copy-bib': cpBib(); break;
+      case 'download-bib': dlBib(); break;
+      case 'choose-storage-folder': await chooseStorageFolder(); break;
+      case 'toggle-realtime-sync': await toggleRealtimeSync(); break;
+      case 'import-from-folder': await importDataFromChosenFolderPrompt(); break;
+      case 'sync-to-folder': await syncAllDataToChosenFolder(true); break;
+      case 'clear-storage-folder': await clearStorageFolder(); break;
+      case 'add-collection': addCollection(); break;
+      case 'set-view': setView(view); break;
+      case 'select-paper': selectPaper(id); break;
+      case 'toggle-star':
+        event.stopPropagation();
+        toggleStar(id);
+        break;
+      case 'toggle-abstract': toggleAbs(); break;
+      case 'remove-tag': rmTagBtn(actionEl); break;
+      case 'set-status': setStatus(id, status); break;
+      case 'prompt-attach-pdf': promptAttachPdf(id); break;
+      case 'open-pdf':
+        event.preventDefault();
+        await openStoredPdf(id);
+        break;
+      case 'remove-pdf': await removeAttachedPdf(id); break;
+      case 'prompt-attach-supplement': promptAttachSupplement(id); break;
+      case 'open-supplement':
+        event.preventDefault();
+        await openStoredSupplement(id, fileId);
+        break;
+      case 'remove-supplement':
+        event.preventDefault();
+        await removeSupplement(id, fileId);
+        break;
+      case 'open-edit-modal': openEditModal(id); break;
+      case 'show-bib': showBib(id); break;
+      case 'delete-paper': await delPaper(id); break;
+      case 'do-fetch': await doFetch(); break;
+      case 'parse-bib': doParseBib(); break;
+      case 'trigger-pdf-input': {
+        const input = document.getElementById('pdf-in');
+        if (input) input.click();
+        break;
+      }
+    }
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+document.addEventListener('input', (event) => {
+  if (event.target.id === 'srch') onSearch(event.target.value);
+});
+
+document.addEventListener('change', async (event) => {
+  const target = event.target;
+  if (target.id === 'fa') onFilter('author', target.value);
+  else if (target.id === 'fy') onFilter('year', target.value);
+  else if (target.id === 'fj') onFilter('journal', target.value);
+  else if (target.id === 'sort') onSort(target.value);
+  else if (target.id === 'pdf-attach-global') await handleExistingPaperPdf(target);
+  else if (target.id === 'supp-attach-global') await handleExistingPaperSupplement(target);
+  else if (target.id === 'pdf-in') await handlePDF(target.files && target.files[0]);
+  else if (target.dataset.action === 'set-collection') setCol(target.dataset.id, target.value);
+  else if (target.dataset.action === 'notes-change') updNotes(target.dataset.id, target.value);
+});
+
+document.addEventListener('keydown', async (event) => {
+  if (event.key==='Escape') document.querySelectorAll('.modal-ov.open').forEach(m=>closeModal(m.id));
+  if (event.target.id === 'doi-in' && event.key === 'Enter') {
+    event.preventDefault();
+    await doFetch();
+  }
+  if (event.target.dataset.action === 'tag-input' && (event.key === 'Enter' || event.key === ',')) {
+    addTag(event.target.dataset.id, event.target.value);
+    event.target.value='';
+    event.preventDefault();
+  }
+});
+
+document.addEventListener('focusout', (event) => {
+  if (event.target.dataset.action === 'tag-input' && event.target.value.trim()) {
+    addTag(event.target.dataset.id, event.target.value);
+    event.target.value='';
+  }
+});
+
+document.addEventListener('dragover', (event) => {
+  const drop = event.target.closest('#pdf-drop');
+  if (!drop) return;
+  event.preventDefault();
+  drop.classList.add('dov');
+});
+
+document.addEventListener('dragleave', (event) => {
+  const drop = event.target.closest('#pdf-drop');
+  if (!drop) return;
+  if (!drop.contains(event.relatedTarget)) drop.classList.remove('dov');
+});
+
+document.addEventListener('drop', async (event) => {
+  const drop = event.target.closest('#pdf-drop');
+  if (!drop) return;
+  event.preventDefault();
+  drop.classList.remove('dov');
+  const file = event.dataTransfer?.files?.[0];
+  if (file) await handlePDF(file);
+});
+
 document.querySelectorAll('.modal-ov').forEach(el => {
   el.addEventListener('click', e => { if(e.target===el) closeModal(el.id); });
 });
-document.addEventListener('keydown', e => {
-  if (e.key==='Escape') document.querySelectorAll('.modal-ov.open').forEach(m=>closeModal(m.id));
-});
-
 /* ============================================================
    INIT
 ============================================================ */
