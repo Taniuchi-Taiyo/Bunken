@@ -1,0 +1,2675 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>bunken — 文献管理</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://api.crossref.org https://export.arxiv.org https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <meta name="referrer" content="no-referrer">
+  <style>
+    /* ===== VARIABLES ===== */
+    :root {
+      --bg:         #FAF8F4;
+      --bg-side:    #F0EDE6;
+      --bg-hover:   #E8E4DC;
+      --bg-sel:     #DDD8CE;
+      --bg-card:    #FFFFFF;
+      --text:       #1A1714;
+      --text-2:     #6B6560;
+      --text-m:     #9A948C;
+      --accent:     #2B5797;
+      --accent-lt:  #E8EFFC;
+      --border:     #D8D4CC;
+      --border-lt:  #E8E4DC;
+      --star:       #C9820A;
+      --c-unread:   #D94F30;
+      --c-reading:  #1E8A5A;
+      --tag-bg:     #E8EFFC;
+      --tag-fg:     #2B5797;
+      --shadow:     0 2px 10px rgba(0,0,0,0.08);
+      --shadow-lg:  0 8px 40px rgba(0,0,0,0.14);
+      --r:          6px;
+      --r-sm:       4px;
+      --ff:         system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --ft:         'Georgia', 'Times New Roman', serif;
+      --fm:         ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:         #1A1714;
+        --bg-side:    #141210;
+        --bg-hover:   #252220;
+        --bg-sel:     #2E2B28;
+        --bg-card:    #252220;
+        --text:       #EDE9E1;
+        --text-2:     #9A948C;
+        --text-m:     #6B6560;
+        --accent:     #7EB8F7;
+        --accent-lt:  #1A2A3A;
+        --border:     #2E2B28;
+        --border-lt:  #252220;
+        --star:       #D4A017;
+        --c-unread:   #F08070;
+        --c-reading:  #5ABF8E;
+        --tag-bg:     #1A2A3A;
+        --tag-fg:     #7EB8F7;
+        --shadow:     0 2px 10px rgba(0,0,0,0.35);
+        --shadow-lg:  0 8px 40px rgba(0,0,0,0.50);
+      }
+    }
+
+    /* ===== RESET ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--ff);
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    button { font-family: var(--ff); }
+    a { color: var(--accent); }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-m); }
+
+    /* ===== LAYOUT ===== */
+    #app { display: flex; height: 100vh; overflow: hidden; }
+
+    .sidebar {
+      width: 196px; min-width: 196px;
+      background: var(--bg-side);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow-y: auto; overflow-x: hidden;
+      flex-shrink: 0;
+    }
+    .list-pane {
+      width: 340px; min-width: 240px;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow: hidden; flex-shrink: 0;
+    }
+    .detail-pane { flex: 1; overflow-y: auto; }
+
+    /* ===== SIDEBAR ===== */
+    .side-logo {
+      padding: 14px 14px 10px;
+      font-family: var(--ft);
+      font-size: 19px; font-weight: 600;
+      color: var(--text);
+      border-bottom: 1px solid var(--border-lt);
+      letter-spacing: -0.2px;
+    }
+    .side-logo span { color: var(--accent); }
+
+    .side-sec { padding: 8px 0; border-bottom: 1px solid var(--border-lt); }
+
+    .side-sec-hd {
+      padding: 2px 14px 5px;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.9px; text-transform: uppercase;
+      color: var(--text-m);
+      display: flex; align-items: center;
+    }
+    .side-sec-hd button {
+      margin-left: auto;
+      background: none; border: none; cursor: pointer;
+      color: var(--text-m); font-size: 15px; line-height: 1;
+      padding: 0 2px; border-radius: 3px;
+      transition: color .1s;
+    }
+    .side-sec-hd button:hover { color: var(--accent); }
+
+    .side-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 14px; cursor: pointer;
+      font-size: 13px; color: var(--text-2);
+      transition: background .1s, color .1s;
+      user-select: none;
+    }
+    .side-item:hover { background: var(--bg-hover); color: var(--text); }
+    .side-item.active { background: var(--bg-sel); color: var(--text); font-weight: 500; }
+    .side-item .ico { font-size: 12px; flex-shrink: 0; opacity: .8; }
+    .side-item .lbl { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .side-item .cnt {
+      margin-left: auto; flex-shrink: 0;
+      font-size: 10px; color: var(--text-m);
+      background: var(--bg-hover);
+      padding: 0 5px; border-radius: 9px; min-width: 18px; text-align: center;
+    }
+    .side-item.active .cnt { background: var(--bg); }
+    .side-item .side-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+    .side-item .side-actions .cnt { margin-left: 0; }
+    .side-item .side-act {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-m); font-size: 11px; line-height: 1;
+      padding: 1px 3px; border-radius: 3px; flex-shrink: 0;
+      transition: background .1s, color .1s;
+    }
+    .side-item .side-act:hover { background: var(--bg); color: var(--text); }
+    .side-item .side-act:disabled {
+      opacity: .35; cursor: default; pointer-events: none;
+    }
+    .side-item.active .side-act:hover { background: var(--bg-hover); }
+
+    .side-empty { padding: 3px 14px 5px; font-size: 11px; color: var(--text-m); }
+    .side-btn-row { display:block; margin-top:6px; }
+    .diff-chip {
+      display:inline-flex; align-items:center; justify-content:center;
+      min-width: 40px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 10px; font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--bg-hover);
+      color: var(--text-2);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .side-btn-flex {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .side-btn-label { min-width: 0; }
+    .diff-chip.diff-remote { color: var(--accent); border-color: var(--accent); background: var(--accent-lt); }
+    .diff-chip.diff-local { color: var(--c-reading); border-color: var(--c-reading); background: #DFF5EC; }
+    @media (prefers-color-scheme: dark) {
+      .diff-chip.diff-local { background: #112A1E; }
+    }
+    .side-storage { padding: 8px 14px 10px; display: flex; flex-direction: column; gap: 6px; }
+    .side-storage-name { font-size: 12px; color: var(--text-2); line-height: 1.4; word-break: break-word; }
+    .side-storage-status { font-size: 11px; color: var(--text-m); line-height: 1.4; }
+    .side-btn {
+      width: 100%; text-align: left;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 6px 8px;
+      color: var(--text-2); font-size: 12px; cursor: pointer;
+      transition: background .1s, color .1s, border-color .1s;
+    }
+    .side-btn:hover { background: var(--bg-hover); color: var(--text); border-color: var(--text-m); }
+
+    /* ===== LIST PANE ===== */
+    .list-hd {
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .list-hd-top {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .list-title { font-size: 13px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-add {
+      display: flex; align-items: center; gap: 4px;
+      background: var(--accent); color: white;
+      border: none; padding: 5px 10px;
+      border-radius: var(--r-sm);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      transition: opacity .15s; white-space: nowrap; flex-shrink: 0;
+    }
+    .btn-add:hover { opacity: .85; }
+
+    .search-wrap { position: relative; margin-bottom: 6px; }
+    .search-wrap .si { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-m); pointer-events: none; }
+    .search-wrap input {
+      width: 100%; background: var(--bg-hover);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 5px 8px 5px 24px;
+      font-size: 12px; font-family: var(--ff); color: var(--text); outline: none;
+    }
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-wrap input::placeholder { color: var(--text-m); }
+
+    .filter-row { display: flex; gap: 4px; }
+    .filter-row select {
+      flex: 1; min-width: 0;
+      background: var(--bg-hover); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 3px 5px;
+      font-size: 11px; font-family: var(--ff); color: var(--text-2); outline: none; cursor: pointer;
+    }
+    .filter-row select:focus { border-color: var(--accent); }
+
+    .paper-list { flex: 1; overflow-y: auto; }
+
+    .paper-item {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border-lt);
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .paper-item:hover { background: var(--bg-hover); }
+    .paper-item.sel { background: var(--bg-sel); }
+
+    .pi-top { display: flex; align-items: flex-start; gap: 5px; margin-bottom: 3px; }
+    .pi-star {
+      background: none; border: none; cursor: pointer;
+      font-size: 12px; padding: 0; line-height: 1;
+      color: var(--text-m); transition: color .1s; flex-shrink: 0; margin-top: 1px;
+    }
+    .pi-star:hover, .pi-star.on { color: var(--star); }
+    .pi-title {
+      flex: 1; font-size: 13px; font-weight: 500; color: var(--text);
+      line-height: 1.3;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .pi-year { font-size: 11px; color: var(--text-m); flex-shrink: 0; margin-top: 1px; }
+    .pi-meta { font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 5px; }
+    .pi-bot { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+    .badge {
+      font-size: 10px; padding: 1px 6px; border-radius: 9px; font-weight: 500;
+    }
+    .badge.unread   { background: #FEE8E2; color: var(--c-unread); }
+    .badge.reading  { background: #DFF5EC; color: var(--c-reading); }
+    .badge.read     { background: var(--bg-hover); color: var(--text-m); }
+    @media (prefers-color-scheme: dark) {
+      .badge.unread  { background: #3A1A14; }
+      .badge.reading { background: #112A1E; }
+    }
+    .tag-pill {
+      font-size: 10px; padding: 1px 7px; border-radius: 9px;
+      background: var(--tag-bg); color: var(--tag-fg);
+    }
+    .pi-cit { font-size: 10px; color: var(--text-m); margin-left: auto; }
+
+    .empty-list {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; gap: 8px; color: var(--text-m); font-size: 13px;
+      padding: 40px 20px; text-align: center;
+    }
+    .empty-list .ei { font-size: 30px; margin-bottom: 4px; }
+
+    /* ===== DETAIL PANE ===== */
+    .detail-ph {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; color: var(--text-m); font-size: 13px; gap: 8px;
+    }
+    .detail-ph .phi { font-size: 38px; margin-bottom: 4px; }
+
+    .detail-wrap { padding: 26px 30px; max-width: 820px; }
+
+    .d-star {
+      background: none; border: none; cursor: pointer;
+      font-size: 22px; padding: 0; margin-bottom: 10px; display: block;
+      color: var(--text-m); transition: transform .15s, color .15s;
+    }
+    .d-star:hover { transform: scale(1.15); }
+    .d-star.on { color: var(--star); }
+
+    .d-type {
+      font-size: 10px; font-weight: 600; letter-spacing: 1px;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 6px;
+    }
+    .d-title {
+      font-family: var(--ft); font-size: 22px; font-weight: 600;
+      line-height: 1.3; color: var(--text); margin-bottom: 8px;
+    }
+    .d-authors { font-size: 14px; color: var(--text-2); margin-bottom: 3px; }
+    .d-venue { font-size: 13px; color: var(--text-m); margin-bottom: 12px; }
+    .d-links { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 14px; }
+    .d-link {
+      font-size: 11px; padding: 3px 10px; border-radius: 12px;
+      border: 1px solid var(--border); color: var(--accent);
+      text-decoration: none; font-weight: 500; transition: background .1s;
+    }
+    .d-link:hover { background: var(--accent-lt); }
+    button.d-link { background: none; cursor: pointer; font-family: var(--ff); }
+    .d-cit {
+      font-size: 12px; color: var(--text-2); margin-bottom: 12px;
+      display: flex; align-items: baseline; gap: 5px;
+    }
+    .d-cit strong { font-size: 18px; font-weight: 600; color: var(--text); }
+
+    .d-div { border: none; border-top: 1px solid var(--border-lt); margin: 14px 0; }
+    .d-sh {
+      font-size: 10px; font-weight: 600; letter-spacing: .8px;
+      text-transform: uppercase; color: var(--text-m); margin-bottom: 7px;
+    }
+
+    .d-abstract { font-size: 13.5px; color: var(--text-2); line-height: 1.7; }
+    .d-abstract.coll {
+      display: -webkit-box; -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .expand-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--accent); font-size: 11.5px; font-family: var(--ff);
+      padding: 4px 0; text-decoration: underline;
+    }
+
+    .tags-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .tag-edit {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 11px; padding: 2px 6px 2px 8px;
+      border-radius: 9px; background: var(--tag-bg); color: var(--tag-fg);
+    }
+    .tag-edit button {
+      background: none; border: none; cursor: pointer;
+      color: var(--tag-fg); opacity: .5; font-size: 11px;
+      padding: 0; line-height: 1; transition: opacity .1s;
+    }
+    .tag-edit button:hover { opacity: 1; }
+    .tag-in {
+      font-size: 12px; font-family: var(--ff);
+      background: none; border: 1px dashed var(--border);
+      border-radius: 9px; padding: 2px 9px;
+      color: var(--text); outline: none; width: 110px;
+    }
+    .tag-in:focus { border-color: var(--accent); }
+
+    .status-row { display: flex; gap: 6px; }
+    .s-btn {
+      font-size: 11px; padding: 4px 10px; border-radius: 12px;
+      border: 1px solid var(--border); background: none;
+      color: var(--text-2); cursor: pointer; font-family: var(--ff);
+      transition: all .1s;
+    }
+    .s-btn:hover { border-color: var(--text-m); color: var(--text); }
+    .s-btn.on-unread   { background: #FEE8E2; color: var(--c-unread);  border-color: var(--c-unread);  font-weight: 500; }
+    .s-btn.on-reading  { background: #DFF5EC; color: var(--c-reading); border-color: var(--c-reading); font-weight: 500; }
+    .s-btn.on-read     { background: var(--bg-hover); color: var(--text); border-color: var(--border); font-weight: 500; }
+    @media (prefers-color-scheme: dark) {
+      .s-btn.on-unread  { background: #3A1A14; }
+      .s-btn.on-reading { background: #112A1E; }
+    }
+
+    .col-select {
+      background: var(--bg-hover); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 5px 8px;
+      font-size: 12px; font-family: var(--ff); color: var(--text);
+      outline: none; cursor: pointer; min-width: 160px;
+    }
+    .col-select:focus { border-color: var(--accent); }
+
+    .notes-ta {
+      width: 100%; background: var(--bg-hover);
+      border: 1px solid var(--border); border-radius: var(--r);
+      padding: 10px 12px; font-size: 13px; font-family: var(--ff);
+      color: var(--text); resize: vertical; min-height: 80px;
+      outline: none; line-height: 1.5;
+    }
+    .notes-ta:focus { border-color: var(--accent); }
+
+    .d-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-sec {
+      display: flex; align-items: center; gap: 5px;
+      background: none; border: 1px solid var(--border);
+      padding: 6px 12px; border-radius: var(--r-sm);
+      font-size: 12px; color: var(--text-2); cursor: pointer; transition: all .1s;
+    }
+    .btn-sec:hover { background: var(--bg-hover); color: var(--text); }
+    .btn-del {
+      background: none; border: 1px solid var(--c-unread);
+      padding: 6px 12px; border-radius: var(--r-sm);
+      font-size: 12px; color: var(--c-unread); cursor: pointer; transition: all .1s;
+    }
+    .btn-del:hover { background: #FEE8E2; }
+    @media (prefers-color-scheme: dark) { .btn-del:hover { background: #3A1A14; } }
+
+    /* ===== MODAL ===== */
+    .modal-ov {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    @media (prefers-color-scheme: dark) { .modal-ov { background: rgba(0,0,0,.60); } }
+    .modal-ov.open { display: flex; }
+
+    .modal-box {
+      background: var(--bg-card); border-radius: 10px;
+      box-shadow: var(--shadow-lg);
+      width: 620px; max-width: 95vw; max-height: 90vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      animation: mUp .22s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes mUp { from { opacity:0; transform: translateY(14px) scale(.97); } to { opacity:1; transform: none; } }
+
+    .modal-hd {
+      padding: 15px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .modal-hd-title { font-size: 15px; font-weight: 600; }
+    .modal-x {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-m); font-size: 17px; padding: 2px 6px;
+      border-radius: 4px; line-height: 1; transition: color .1s;
+    }
+    .modal-x:hover { color: var(--text); }
+
+    .modal-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-hover);
+      padding: 0 20px;
+      flex-shrink: 0;
+    }
+    .m-tab {
+      background: none; border: none; border-bottom: 2px solid transparent;
+      padding: 9px 13px; margin-bottom: -1px;
+      font-size: 12px; font-family: var(--ff); font-weight: 500;
+      color: var(--text-m); cursor: pointer; transition: all .1s;
+    }
+    .m-tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+    .m-tab:hover:not(.on) { color: var(--text); }
+
+    .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+
+    .modal-ft {
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: flex-end; gap: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Form elements */
+    .fg { margin-bottom: 13px; }
+    .fl {
+      display: block; font-size: 10px; font-weight: 600;
+      letter-spacing: .6px; text-transform: uppercase;
+      color: var(--text-m); margin-bottom: 4px;
+    }
+    .fi, .fta, .fsel {
+      width: 100%;
+      background: var(--bg-hover); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 7px 10px;
+      font-size: 13px; font-family: var(--ff); color: var(--text);
+      outline: none; transition: border-color .1s;
+    }
+    .fi:focus, .fta:focus, .fsel:focus { border-color: var(--accent); }
+    .fi::placeholder, .fta::placeholder { color: var(--text-m); }
+    .fta { resize: vertical; min-height: 80px; line-height: 1.5; }
+    .frow { display: flex; gap: 10px; }
+    .frow .fg { flex: 1; min-width: 0; }
+
+    .fetch-row { display: flex; gap: 8px; }
+    .fetch-row .fi { flex: 1; }
+    .btn-fetch {
+      display: flex; align-items: center; gap: 5px;
+      background: var(--accent); color: white; border: none;
+      padding: 7px 14px; border-radius: var(--r-sm);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      transition: opacity .15s; white-space: nowrap; flex-shrink: 0;
+    }
+    .btn-fetch:hover { opacity: .85; }
+    .btn-fetch:disabled { opacity: .4; cursor: not-allowed; }
+
+    .fs { font-size: 12px; padding: 5px 0; min-height: 22px; color: var(--text-2); }
+    .fs.ok { color: var(--c-reading); }
+    .fs.err { color: var(--c-unread); }
+
+    .preview {
+      background: var(--bg-hover); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 11px 13px;
+      font-size: 12px; color: var(--text-2);
+      display: none; margin-top: 8px; line-height: 1.5;
+    }
+    .preview.on { display: block; }
+    .preview strong { display: block; font-size: 13px; color: var(--text); margin-bottom: 3px; }
+
+    .bta {
+      width: 100%; background: var(--bg-hover);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 10px; font-size: 12px; font-family: var(--fm);
+      color: var(--text); outline: none; resize: vertical;
+      min-height: 160px; line-height: 1.5;
+    }
+    .bta:focus { border-color: var(--accent); }
+
+    .drop-area {
+      border: 2px dashed var(--border); border-radius: var(--r);
+      padding: 34px 20px; text-align: center; cursor: pointer;
+      color: var(--text-m); font-size: 13px; transition: all .15s;
+    }
+    .drop-area:hover, .drop-area.dov { border-color: var(--accent); background: var(--accent-lt); color: var(--accent); }
+    .drop-area .di { font-size: 28px; display: block; margin-bottom: 8px; }
+
+    .bib-out {
+      background: var(--bg-hover); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 16px;
+      font-family: var(--fm); font-size: 12px; color: var(--text);
+      white-space: pre; overflow-x: auto; line-height: 1.65;
+      max-height: 450px; overflow-y: auto;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 20px; right: 20px;
+      background: var(--text); color: var(--bg);
+      padding: 9px 16px; border-radius: var(--r);
+      font-size: 13px; z-index: 200;
+      opacity: 0; transform: translateY(8px);
+      transition: all .2s; pointer-events: none;
+    }
+    .toast.on { opacity: 1; transform: none; }
+
+    /* Spinner */
+    .spin {
+      display: inline-block; width: 11px; height: 11px;
+      border: 2px solid currentColor; border-right-color: transparent;
+      border-radius: 50%; animation: rot .6s linear infinite;
+    }
+    @keyframes rot { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="sidebar" id="sidebar"></div>
+  <div class="list-pane">
+    <div class="list-hd">
+      <div class="list-hd-top">
+        <span class="list-title" id="list-title">すべての文献</span>
+        <button class="btn-add" type="button" data-action="open-add-modal">＋ 追加</button>
+      </div>
+      <div class="search-wrap">
+        <span class="si">🔍</span>
+        <input type="text" id="srch" placeholder="タイトル・著者・キーワードで検索...">
+      </div>
+      <div class="filter-row">
+        <select id="fa" title="著者フィルタ"><option value="">著者…</option></select>
+        <select id="fy" title="年フィルタ"><option value="">年…</option></select>
+        <select id="fj" title="誌名フィルタ"><option value="">誌名…</option></select>
+        <select id="sort" title="並び替え">
+          <option value="addedAt">追加順</option>
+          <option value="year">年</option>
+          <option value="title">タイトル</option>
+          <option value="citationCount">被引用数</option>
+        </select>
+      </div>
+    </div>
+    <div class="paper-list" id="paper-list"></div>
+  </div>
+  <div class="detail-pane" id="detail-pane"></div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-ov" id="add-modal">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <span class="modal-hd-title" id="modal-hd-title">文献を追加</span>
+      <button class="modal-x" type="button" data-action="close-modal" data-modal="add-modal">✕</button>
+    </div>
+    <div class="modal-tabs" id="modal-tabs">
+      <button class="m-tab on" type="button" data-action="switch-tab" data-tab="doi">DOI / arXiv</button>
+      <button class="m-tab" type="button" data-action="switch-tab" data-tab="bibtex">BibTeX</button>
+      <button class="m-tab" type="button" data-action="switch-tab" data-tab="manual">手動入力</button>
+      <button class="m-tab" type="button" data-action="switch-tab" data-tab="pdf">PDF</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-ft">
+      <button class="btn-sec" type="button" data-action="close-modal" data-modal="add-modal">キャンセル</button>
+      <button class="btn-add" id="modal-save" type="button" data-action="save-modal">追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- BIBTEX MODAL -->
+<div class="modal-ov" id="bib-modal">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <span class="modal-hd-title">BibTeX 出力</span>
+      <button class="modal-x" type="button" data-action="close-modal" data-modal="bib-modal">✕</button>
+    </div>
+    <div class="modal-body"><pre class="bib-out" id="bib-out"></pre></div>
+    <div class="modal-ft">
+      <button class="btn-sec" type="button" data-action="copy-bib">📋 コピー</button>
+      <button class="btn-sec" type="button" data-action="download-bib">⬇ ダウンロード</button>
+      <button class="btn-sec" type="button" data-action="close-modal" data-modal="bib-modal">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="pdf-attach-global" accept=".pdf,application/pdf" style="display:none">
+<input type="file" id="supp-attach-global" multiple style="display:none">
+<div class="toast" id="toast"></div>
+
+<script>
+const PDFJS_MODULE_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.mjs';
+const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.worker.min.mjs';
+let pdfjsModulePromise = null;
+
+async function getPdfJsLib() {
+  if (!pdfjsModulePromise) {
+    pdfjsModulePromise = import(PDFJS_MODULE_URL).then(mod => {
+      const lib = mod.default || mod;
+      lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+      return lib;
+    }).catch(err => {
+      pdfjsModulePromise = null;
+      throw err;
+    });
+  }
+  return pdfjsModulePromise;
+}
+
+/* ============================================================
+   STATE
+============================================================ */
+let S = {
+  papers: [],
+  collections: [],
+  selectedId: null,
+  view: 'all',
+  filters: { search: '', author: '', year: '', journal: '' },
+  sortBy: 'addedAt',
+  absExpanded: false
+};
+
+let STORAGE_STATE = {
+  folderHandle: null,
+  folderName: '',
+  available: typeof window.showDirectoryPicker === 'function',
+  status: 'browser',
+  lastSyncedAt: '',
+  syncTimer: null,
+  syncInFlight: null,
+  syncSuspended: false,
+  syncBaseline: null,
+  localDiff: { added: 0, removed: 0, modified: 0 },
+  remoteDiff: { added: 0, removed: 0, modified: 0 },
+  remoteWatchTimer: null,
+  remoteScanInFlight: null,
+  remoteLastSeenSavedAt: '',
+  remoteLastSeenFingerprint: '',
+  realtimeSync: true
+};
+
+// Modal working state
+let M = {
+  tab: 'doi',
+  editId: null,
+  pending: null   // paper from fetch/parse awaiting save
+};
+
+/* ============================================================
+   STORAGE
+============================================================ */
+const SAFE_PAPER_TYPES = new Set(['article', 'inproceedings', 'preprint', 'book', 'misc', 'phdthesis', 'mastersthesis']);
+const SAFE_READ_STATUS = new Set(['unread', 'reading', 'read']);
+const SAFE_URL_PROTOCOLS = new Set(['https:', 'http:']);
+
+function sanitizeText(value, maxLen = 5000) {
+  if (value == null) return '';
+  return String(value).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, maxLen);
+}
+
+function sanitizeId(value) {
+  const cleaned = sanitizeText(value, 120).replace(/[^A-Za-z0-9:_-]/g, '');
+  return cleaned || uid();
+}
+
+function normalizeYear(value) {
+  const n = parseInt(value, 10);
+  return Number.isInteger(n) && n >= 1000 && n <= 3000 ? n : null;
+}
+
+function normalizeCount(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null;
+}
+
+function normalizeType(value) {
+  return SAFE_PAPER_TYPES.has(value) ? value : 'article';
+}
+
+function normalizeReadStatus(value) {
+  return SAFE_READ_STATUS.has(value) ? value : 'unread';
+}
+
+function sanitizeStringArray(values, maxItems = 50, maxLen = 160) {
+  if (!Array.isArray(values)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const value of values) {
+    const item = sanitizeText(value, maxLen);
+    if (!item || seen.has(item)) continue;
+    seen.add(item);
+    out.push(item);
+    if (out.length >= maxItems) break;
+  }
+  return out;
+}
+
+function sanitizeExternalUrl(raw) {
+  const value = sanitizeText(raw, 2048);
+  if (!value) return '';
+  try {
+    const url = new URL(value, window.location.href);
+    if (!SAFE_URL_PROTOCOLS.has(url.protocol)) return '';
+    return url.href;
+  } catch (_) {
+    return '';
+  }
+}
+
+function sanitizeRelativePath(raw) {
+  const value = sanitizeText(raw, 240).replace(/\\/g, '/').trim();
+  if (!value || value.startsWith('/')) return '';
+  const parts = value.split('/').filter(Boolean);
+  if (!parts.length) return '';
+  for (const part of parts) {
+    if (part === '.' || part === '..') return '';
+    if (/[\u0000-\u001f\u007f]/.test(part)) return '';
+  }
+  return parts.join('/');
+}
+
+function normalizeCollection(value) {
+  return {
+    id: sanitizeId(value?.id),
+    name: sanitizeText(value?.name, 80) || 'Untitled'
+  };
+}
+
+function normalizePaper(p) {
+  const safeId = sanitizeId(p?.id);
+  const safePdfId = p?.pdfId ? sanitizeId(p.pdfId) : safeId;
+  return {
+    id: safeId,
+    type: normalizeType(p?.type),
+    bibtexKey: sanitizeText(p?.bibtexKey, 120),
+    title: sanitizeText(p?.title, 500),
+    authors: sanitizeStringArray(Array.isArray(p?.authors) ? p.authors : [], 40, 160),
+    year: normalizeYear(p?.year),
+    journal: sanitizeText(p?.journal, 240),
+    volume: sanitizeText(p?.volume, 40),
+    number: sanitizeText(p?.number, 40),
+    pages: sanitizeText(p?.pages, 60),
+    publisher: sanitizeText(p?.publisher, 240),
+    doi: sanitizeText(p?.doi, 256),
+    arxivId: sanitizeText(p?.arxivId, 128),
+    url: sanitizeExternalUrl(p?.url),
+    abstract: sanitizeText(p?.abstract, 12000),
+    citationCount: normalizeCount(p?.citationCount),
+    tags: sanitizeStringArray(Array.isArray(p?.tags) ? p.tags : [], 60, 40),
+    collections: sanitizeStringArray(Array.isArray(p?.collections) ? p.collections : [], 10, 120),
+    starred: !!p?.starred,
+    readStatus: normalizeReadStatus(p?.readStatus),
+    notes: sanitizeText(p?.notes, 12000),
+    addedAt: sanitizeText(p?.addedAt, 40) || new Date().toISOString(),
+    pdfId: safePdfId,
+    pdfName: sanitizeText(p?.pdfName, 200),
+    pdfOriginalName: sanitizeText(p?.pdfOriginalName, 200),
+    pdfPath: sanitizeRelativePath(p?.pdfPath),
+    hasPdf: !!p?.hasPdf,
+    supplementalFiles: Array.isArray(p?.supplementalFiles)
+      ? p.supplementalFiles.slice(0, 50).map((f, idx) => ({
+          id: sanitizeId(f?.id),
+          name: sanitizeText(f?.name, 200),
+          originalName: sanitizeText(f?.originalName || f?.name, 200),
+          path: sanitizeRelativePath(f?.path),
+          type: sanitizeText(f?.type, 120) || 'application/octet-stream',
+          size: Math.max(0, Number(f?.size) || 0),
+          updatedAt: sanitizeText(f?.updatedAt, 40) || new Date().toISOString(),
+          slot: Number.isFinite(f?.slot) ? f.slot : (idx + 1)
+        }))
+      : []
+  };
+}
+
+function load() {
+  try {
+    const d = localStorage.getItem('bunken_v1');
+    if (d) { const p = JSON.parse(d); S.papers = (p.papers||[]).map(normalizePaper); S.collections = Array.isArray(p.collections) ? p.collections.map(normalizeCollection) : []; }
+  } catch(e) {}
+}
+function save() {
+  try { localStorage.setItem('bunken_v1', JSON.stringify({ papers: S.papers, collections: S.collections })); }
+  catch(e) { if (e.name === 'QuotaExceededError') toast('⚠ ストレージが上限に近づいています'); }
+  recomputeLocalDiff();
+  if (document.getElementById('sidebar')) renderSidebar();
+  if (!STORAGE_STATE.syncSuspended) scheduleFolderSync();
+}
+
+
+const PDF_DB_NAME = 'bunken_pdf_db';
+const PDF_STORE = 'pdfs';
+const MATERIAL_STORE = 'materials';
+const SETTINGS_STORE = 'settings';
+let pdfDbPromise = null;
+
+function openPdfDb() {
+  if (!('indexedDB' in window)) return Promise.reject(new Error('このブラウザは IndexedDB に対応していません'));
+  if (pdfDbPromise) return pdfDbPromise;
+  pdfDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(PDF_DB_NAME, 3);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(PDF_STORE)) db.createObjectStore(PDF_STORE, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(MATERIAL_STORE)) db.createObjectStore(MATERIAL_STORE, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(SETTINGS_STORE)) db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IndexedDB を開けませんでした'));
+  });
+  return pdfDbPromise;
+}
+
+async function putPdfBlob(id, file) {
+  const db = await openPdfDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PDF_STORE, 'readwrite');
+    tx.objectStore(PDF_STORE).put({
+      id,
+      name: file.name,
+      type: file.type || 'application/pdf',
+      updatedAt: new Date().toISOString(),
+      blob: file
+    });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('PDF の保存に失敗しました'));
+  });
+}
+
+async function getPdfBlob(id) {
+  const db = await openPdfDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PDF_STORE, 'readonly');
+    const req = tx.objectStore(PDF_STORE).get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error || new Error('PDF の読み込みに失敗しました'));
+  });
+}
+
+async function deletePdfBlob(id) {
+  const db = await openPdfDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PDF_STORE, 'readwrite');
+    tx.objectStore(PDF_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('PDF の削除に失敗しました'));
+  });
+}
+
+async function putMaterialBlob(id, file) {
+  const db = await openPdfDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(MATERIAL_STORE, 'readwrite');
+    tx.objectStore(MATERIAL_STORE).put({
+      id,
+      name: file.name || 'attachment',
+      type: file.type || 'application/octet-stream',
+      updatedAt: new Date().toISOString(),
+      blob: file
+    });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('補足資料の保存に失敗しました'));
+  });
+}
+
+async function getMaterialBlob(id) {
+  const db = await openPdfDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(MATERIAL_STORE, 'readonly');
+    const req = tx.objectStore(MATERIAL_STORE).get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error || new Error('補足資料の読み込みに失敗しました'));
+  });
+}
+
+async function deleteMaterialBlob(id) {
+  const db = await openPdfDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(MATERIAL_STORE, 'readwrite');
+    tx.objectStore(MATERIAL_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('補足資料の削除に失敗しました'));
+  });
+}
+
+async function putSetting(key, value) {
+  const db = await openPdfDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SETTINGS_STORE, 'readwrite');
+    tx.objectStore(SETTINGS_STORE).put({ key, value });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('設定の保存に失敗しました'));
+  });
+}
+
+async function getSetting(key) {
+  const db = await openPdfDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SETTINGS_STORE, 'readonly');
+    const req = tx.objectStore(SETTINGS_STORE).get(key);
+    req.onsuccess = () => resolve(req.result ? req.result.value : null);
+    req.onerror = () => reject(req.error || new Error('設定の読み込みに失敗しました'));
+  });
+}
+
+async function deleteSetting(key) {
+  const db = await openPdfDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SETTINGS_STORE, 'readwrite');
+    tx.objectStore(SETTINGS_STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('設定の削除に失敗しました'));
+  });
+}
+
+async function ensureFolderPermission(handle) {
+  if (!handle) return false;
+  const opts = { mode: 'readwrite' };
+  if (handle.queryPermission && (await handle.queryPermission(opts)) === 'granted') return true;
+  if (handle.requestPermission && (await handle.requestPermission(opts)) === 'granted') return true;
+  return false;
+}
+
+
+function canonicalizeLibraryData(data) {
+  const papers = (Array.isArray(data?.papers) ? data.papers : []).map(normalizePaper).map(p => ({
+    ...p,
+    authors: [...(p.authors || [])],
+    tags: [...(p.tags || [])],
+    collections: [...(p.collections || [])].sort(),
+    supplementalFiles: [...(p.supplementalFiles || [])]
+      .map((f, idx) => ({
+        id: f.id || '',
+        name: f.name || '',
+        originalName: f.originalName || '',
+        path: f.path || '',
+        type: f.type || 'application/octet-stream',
+        size: f.size || 0,
+        updatedAt: f.updatedAt || '',
+        slot: Number.isFinite(f.slot) ? f.slot : (idx + 1)
+      }))
+      .sort((a, b) => String(a.id).localeCompare(String(b.id)))
+  })).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+
+  const collections = (Array.isArray(data?.collections) ? data.collections : [])
+    .map(c => ({ id: c.id || '', name: c.name || '' }))
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+
+  return { papers, collections };
+}
+
+function getCurrentLibraryData() {
+  return canonicalizeLibraryData({ papers: S.papers, collections: S.collections });
+}
+
+function stableFingerprint(data) {
+  return JSON.stringify(canonicalizeLibraryData(data));
+}
+
+function mapById(arr) {
+  const m = new Map();
+  (arr || []).forEach(item => m.set(String(item.id || ''), item));
+  return m;
+}
+
+function computeLibraryDiff(baseData, otherData) {
+  const base = canonicalizeLibraryData(baseData || {});
+  const other = canonicalizeLibraryData(otherData || {});
+  const basePapers = mapById(base.papers);
+  const otherPapers = mapById(other.papers);
+  const baseCollections = mapById(base.collections);
+  const otherCollections = mapById(other.collections);
+
+  let added = 0, removed = 0, modified = 0;
+
+  for (const [id, paper] of otherPapers) {
+    if (!basePapers.has(id)) added++;
+    else if (JSON.stringify(basePapers.get(id)) !== JSON.stringify(paper)) modified++;
+  }
+  for (const id of basePapers.keys()) {
+    if (!otherPapers.has(id)) removed++;
+  }
+  for (const [id, col] of otherCollections) {
+    if (!baseCollections.has(id)) added++;
+    else if (JSON.stringify(baseCollections.get(id)) !== JSON.stringify(col)) modified++;
+  }
+  for (const id of baseCollections.keys()) {
+    if (!otherCollections.has(id)) removed++;
+  }
+
+  return { added, removed, modified };
+}
+
+function diffHasChanges(diff) {
+  return !!(diff && (diff.added || diff.removed || diff.modified));
+}
+
+function formatDiffBadge(diff) {
+  if (!diffHasChanges(diff)) return '';
+  const parts = [];
+  if (diff.added) parts.push('+' + diff.added);
+  if (diff.removed) parts.push('-' + diff.removed);
+  if (diff.modified) parts.push('~' + diff.modified);
+  return parts.join('/');
+}
+
+function setSyncBaseline(data) {
+  STORAGE_STATE.syncBaseline = canonicalizeLibraryData(data || {});
+  STORAGE_STATE.localDiff = { added: 0, removed: 0, modified: 0 };
+  STORAGE_STATE.remoteDiff = { added: 0, removed: 0, modified: 0 };
+  try { putSetting('syncBaseline', STORAGE_STATE.syncBaseline); } catch (_) {}
+}
+
+function recomputeLocalDiff() {
+  if (!STORAGE_STATE.syncBaseline) {
+    STORAGE_STATE.localDiff = { added: 0, removed: 0, modified: 0 };
+    return STORAGE_STATE.localDiff;
+  }
+  STORAGE_STATE.localDiff = computeLibraryDiff(STORAGE_STATE.syncBaseline, getCurrentLibraryData());
+  return STORAGE_STATE.localDiff;
+}
+
+async function refreshRemoteDiff() {
+  if (!STORAGE_STATE.folderHandle || !STORAGE_STATE.syncBaseline) {
+    STORAGE_STATE.remoteDiff = { added: 0, removed: 0, modified: 0 };
+    if (document.getElementById('sidebar')) renderSidebar();
+    return STORAGE_STATE.remoteDiff;
+  }
+  if (STORAGE_STATE.remoteScanInFlight) return STORAGE_STATE.remoteScanInFlight;
+
+  STORAGE_STATE.remoteScanInFlight = (async () => {
+    try {
+      const ok = await ensureFolderPermission(STORAGE_STATE.folderHandle);
+      if (!ok) throw new Error('保存先フォルダへのアクセス権限がありません');
+      let remoteData = { papers: [], collections: [] };
+      try {
+        remoteData = await readJsonFile(STORAGE_STATE.folderHandle, 'bunken-library.json');
+      } catch (e) {
+        STORAGE_STATE.remoteDiff = computeLibraryDiff(STORAGE_STATE.syncBaseline, remoteData);
+        return STORAGE_STATE.remoteDiff;
+      }
+      const fp = stableFingerprint(remoteData);
+      STORAGE_STATE.remoteLastSeenFingerprint = fp;
+      STORAGE_STATE.remoteLastSeenSavedAt = remoteData.savedAt || '';
+      STORAGE_STATE.remoteDiff = computeLibraryDiff(STORAGE_STATE.syncBaseline, remoteData);
+      return STORAGE_STATE.remoteDiff;
+    } catch (e) {
+      console.warn('remote diff refresh skipped', e);
+      return STORAGE_STATE.remoteDiff;
+    } finally {
+      STORAGE_STATE.remoteScanInFlight = null;
+      if (document.getElementById('sidebar')) renderSidebar();
+    }
+  })();
+
+  return STORAGE_STATE.remoteScanInFlight;
+}
+
+function startRemoteWatch() {
+  stopRemoteWatch();
+  if (!STORAGE_STATE.folderHandle || !STORAGE_STATE.realtimeSync) return;
+  refreshRemoteDiff().catch(err => console.warn(err));
+  STORAGE_STATE.remoteWatchTimer = setInterval(() => {
+    refreshRemoteDiff().catch(err => console.warn(err));
+  }, 8000);
+}
+
+function stopRemoteWatch() {
+  if (STORAGE_STATE.remoteWatchTimer) clearInterval(STORAGE_STATE.remoteWatchTimer);
+  STORAGE_STATE.remoteWatchTimer = null;
+}
+
+async function restoreStorageFolder() {
+  if (!STORAGE_STATE.available) {
+    STORAGE_STATE.status = 'unsupported';
+    return;
+  }
+  try {
+    const handle = await getSetting('storageFolderHandle');
+    const folderName = await getSetting('storageFolderName');
+    const lastSyncedAt = await getSetting('lastSyncedAt');
+    const syncBaseline = await getSetting('syncBaseline');
+    const realtimeSync = await getSetting('realtimeSync');
+    STORAGE_STATE.realtimeSync = realtimeSync !== false;
+    STORAGE_STATE.folderHandle = handle || null;
+    STORAGE_STATE.syncBaseline = syncBaseline ? canonicalizeLibraryData(syncBaseline) : null;
+    STORAGE_STATE.folderName = folderName || (handle && handle.name) || '';
+    STORAGE_STATE.lastSyncedAt = lastSyncedAt || '';
+    STORAGE_STATE.status = handle ? 'folder' : 'browser';
+    recomputeLocalDiff();
+
+    if (handle && STORAGE_STATE.realtimeSync) {
+      try {
+        const ok = await ensureFolderPermission(handle);
+        if (ok) {
+          let hasRemoteLibrary = false;
+          try {
+            await handle.getFileHandle('bunken-library.json');
+            hasRemoteLibrary = true;
+          } catch (_) {}
+          if (hasRemoteLibrary) {
+            await importDataFromFolder(handle, { replaceExisting: true, showToast: false, askConfirm: false });
+            STORAGE_STATE.lastSyncedAt = lastSyncedAt || STORAGE_STATE.lastSyncedAt || '';
+          }
+        }
+      } catch (e) {
+        console.warn('saved folder auto-import skipped', e);
+      }
+    }
+    if (handle && STORAGE_STATE.realtimeSync) startRemoteWatch();
+  } catch (e) {
+    console.error(e);
+    STORAGE_STATE.status = 'browser';
+  }
+}
+
+function scheduleFolderSync() {
+  if (!STORAGE_STATE.folderHandle || !STORAGE_STATE.realtimeSync) return;
+  if (STORAGE_STATE.syncTimer) clearTimeout(STORAGE_STATE.syncTimer);
+  STORAGE_STATE.syncTimer = setTimeout(() => {
+    syncAllDataToChosenFolder(false).catch(err => console.error(err));
+  }, 700);
+}
+
+async function toggleRealtimeSync() {
+  STORAGE_STATE.realtimeSync = !STORAGE_STATE.realtimeSync;
+  try { await putSetting('realtimeSync', STORAGE_STATE.realtimeSync); } catch (e) { console.error(e); }
+
+  if (!STORAGE_STATE.realtimeSync) {
+    stopRemoteWatch();
+    if (STORAGE_STATE.syncTimer) {
+      clearTimeout(STORAGE_STATE.syncTimer);
+      STORAGE_STATE.syncTimer = null;
+    }
+    toast('リアルタイム同期をOFFにしました。以後は「保存先から読み込む」または「今すぐ同期」を押すまで同期しません');
+  } else {
+    toast('リアルタイム同期をONにしました');
+    if (STORAGE_STATE.folderHandle) {
+      startRemoteWatch();
+      scheduleFolderSync();
+    }
+  }
+  renderSidebar();
+}
+
+async function chooseStorageFolder() {
+  if (!STORAGE_STATE.available) {
+    alert('このブラウザでは保存先フォルダの指定に対応していません。Chrome / Edge 系ブラウザを利用してください。');
+    return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    const ok = await ensureFolderPermission(handle);
+    if (!ok) throw new Error('保存先フォルダへのアクセスが許可されませんでした');
+    STORAGE_STATE.folderHandle = handle;
+    STORAGE_STATE.folderName = handle.name || '選択済みフォルダ';
+    STORAGE_STATE.status = 'folder';
+    await putSetting('storageFolderHandle', handle);
+    await putSetting('storageFolderName', STORAGE_STATE.folderName);
+    await putSetting('realtimeSync', STORAGE_STATE.realtimeSync);
+    renderSidebar();
+    if (STORAGE_STATE.realtimeSync) startRemoteWatch();
+
+    let hasRemoteLibrary = false;
+    try {
+      await handle.getFileHandle('bunken-library.json');
+      hasRemoteLibrary = true;
+    } catch (_) {}
+
+    if (!STORAGE_STATE.realtimeSync) {
+      STORAGE_STATE.remoteDiff = hasRemoteLibrary && STORAGE_STATE.syncBaseline
+        ? await refreshRemoteDiff()
+        : STORAGE_STATE.remoteDiff;
+      renderSidebar();
+      toast('保存先を設定しました。リアルタイム同期OFFのため、読み込みや同期は手動で行ってください');
+      return;
+    }
+
+    if (hasRemoteLibrary) {
+      const shouldImport = confirm('保存先に既存の bunken-library.json が見つかりました。このフォルダのデータを読み込みますか？\n「キャンセル」を選ぶと、現在のブラウザ内データをこのフォルダへ同期します。');
+      if (shouldImport) {
+        await importDataFromFolder(handle, { replaceExisting: true, showToast: true, askConfirm: false });
+        return;
+      }
+    }
+
+    await syncAllDataToChosenFolder(true);
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    console.error(e);
+    alert('保存先フォルダの設定に失敗しました: ' + e.message);
+  }
+}
+
+async function clearStorageFolder() {
+  STORAGE_STATE.folderHandle = null;
+  STORAGE_STATE.folderName = '';
+  STORAGE_STATE.status = 'browser';
+  STORAGE_STATE.lastSyncedAt = '';
+  STORAGE_STATE.remoteDiff = { added: 0, removed: 0, modified: 0 };
+  stopRemoteWatch();
+  if (STORAGE_STATE.syncTimer) clearTimeout(STORAGE_STATE.syncTimer);
+  try {
+    await deleteSetting('storageFolderHandle');
+    await deleteSetting('storageFolderName');
+    await deleteSetting('lastSyncedAt');
+    await deleteSetting('syncedPaths');
+    await deleteSetting('syncBaseline');
+  } catch (e) {
+    console.error(e);
+  }
+  renderSidebar();
+  toast('ブラウザ保存モードに戻しました');
+}
+
+async function getOrCreateDirectory(parentHandle, name) {
+  return parentHandle.getDirectoryHandle(name, { create: true });
+}
+
+async function writeBlobToFile(dirHandle, fileName, blob) {
+  const fh = await dirHandle.getFileHandle(fileName, { create: true });
+  const writable = await fh.createWritable();
+  await writable.write(blob);
+  await writable.close();
+}
+
+async function removeRelativePath(rootHandle, relPath) {
+  if (!rootHandle || !relPath) return;
+  const parts = String(relPath).split('/').filter(Boolean);
+  if (!parts.length) return;
+  let current = rootHandle;
+  for (let i = 0; i < parts.length - 1; i++) {
+    current = await current.getDirectoryHandle(parts[i]);
+  }
+  await current.removeEntry(parts[parts.length - 1]);
+}
+
+async function writeJsonFile(rootHandle, fileName, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  await writeBlobToFile(rootHandle, fileName, blob);
+}
+
+async function readJsonFile(rootHandle, fileName) {
+  const fh = await rootHandle.getFileHandle(fileName);
+  const file = await fh.getFile();
+  return JSON.parse(await file.text());
+}
+
+async function readRelativeFile(rootHandle, relPath) {
+  if (!rootHandle || !relPath) return null;
+  const parts = String(relPath).split('/').filter(Boolean);
+  if (!parts.length) return null;
+  let current = rootHandle;
+  for (let i = 0; i < parts.length - 1; i++) {
+    current = await current.getDirectoryHandle(parts[i]);
+  }
+  const fh = await current.getFileHandle(parts[parts.length - 1]);
+  return await fh.getFile();
+}
+
+async function importDataFromFolder(handle, opts = {}) {
+  const options = Object.assign({ replaceExisting: true, showToast: true, askConfirm: false }, opts || {});
+  if (!handle) throw new Error('保存先フォルダが選択されていません');
+  const ok = await ensureFolderPermission(handle);
+  if (!ok) throw new Error('保存先フォルダへのアクセス権限がありません');
+
+  let data;
+  try {
+    data = await readJsonFile(handle, 'bunken-library.json');
+  } catch (e) {
+    throw new Error('bunken-library.json を読み込めませんでした');
+  }
+
+  if (!data || !Array.isArray(data.papers)) {
+    throw new Error('bunken-library.json の形式が不正です');
+  }
+
+  if (options.askConfirm) {
+    const msg = options.replaceExisting
+      ? '保存先の bunken-library.json を読み込んで、現在のライブラリを置き換えますか？'
+      : '保存先の bunken-library.json を読み込んで、現在のライブラリに追加しますか？';
+    if (!confirm(msg)) return false;
+  }
+
+  const importedPapers = data.papers.map(normalizePaper);
+  const importedCollections = Array.isArray(data.collections) ? data.collections.map(normalizeCollection) : [];
+
+  for (const paper of importedPapers) {
+    if (paper.hasPdf && paper.pdfId && paper.pdfPath) {
+      try {
+        const pdfFile = await readRelativeFile(handle, paper.pdfPath);
+        if (pdfFile) await putPdfBlob(paper.pdfId, pdfFile);
+      } catch (e) {
+        console.warn('PDF import skipped', paper.pdfPath, e);
+      }
+    }
+
+    for (const meta of (paper.supplementalFiles || [])) {
+      if (!meta.id || !meta.path) continue;
+      try {
+        const suppFile = await readRelativeFile(handle, meta.path);
+        if (suppFile) await putMaterialBlob(meta.id, suppFile);
+      } catch (e) {
+        console.warn('Supplement import skipped', meta.path, e);
+      }
+    }
+  }
+
+  if (options.replaceExisting) {
+    S.papers = importedPapers;
+    S.collections = importedCollections;
+  } else {
+    const existingPaperIds = new Set(S.papers.map(p => p.id));
+    const existingCollectionIds = new Set(S.collections.map(c => c.id));
+    importedPapers.forEach(p => {
+      if (!existingPaperIds.has(p.id)) S.papers.push(p);
+    });
+    importedCollections.forEach(c => {
+      if (!existingCollectionIds.has(c.id)) S.collections.push(c);
+    });
+  }
+
+  S.selectedId = S.papers[0] ? S.papers[0].id : null;
+  STORAGE_STATE.folderHandle = handle;
+  STORAGE_STATE.folderName = STORAGE_STATE.folderName || handle.name || '選択済みフォルダ';
+  STORAGE_STATE.status = 'folder';
+  setSyncBaseline({ papers: S.papers, collections: S.collections });
+  STORAGE_STATE.syncSuspended = true;
+  try { save(); } finally { STORAGE_STATE.syncSuspended = false; }
+  try {
+    await putSetting('storageFolderHandle', handle);
+    await putSetting('storageFolderName', STORAGE_STATE.folderName);
+  } catch (_) {}
+  if (STORAGE_STATE.realtimeSync) startRemoteWatch();
+  await refreshRemoteDiff();
+  render();
+  if (options.showToast) toast('保存先フォルダから読み込みました');
+  return true;
+}
+
+async function importDataFromChosenFolderPrompt() {
+  if (!STORAGE_STATE.folderHandle) {
+    alert('先に保存先フォルダを選択してください');
+    return;
+  }
+  try {
+    await importDataFromFolder(STORAGE_STATE.folderHandle, { replaceExisting: true, showToast: true, askConfirm: true });
+  } catch (e) {
+    console.error(e);
+    alert('保存先からの読み込みに失敗しました: ' + e.message);
+  }
+}
+
+async function syncAllDataToChosenFolder(showToast = false) {
+  if (!STORAGE_STATE.folderHandle) return false;
+  if (STORAGE_STATE.syncTimer) {
+    clearTimeout(STORAGE_STATE.syncTimer);
+    STORAGE_STATE.syncTimer = null;
+  }
+  if (STORAGE_STATE.syncInFlight) return STORAGE_STATE.syncInFlight;
+
+  STORAGE_STATE.syncInFlight = (async () => {
+    const handle = STORAGE_STATE.folderHandle;
+    const ok = await ensureFolderPermission(handle);
+    if (!ok) throw new Error('保存先フォルダへの書き込み権限がありません');
+
+    const pdfDir = await getOrCreateDirectory(handle, 'pdfs');
+    const suppDir = await getOrCreateDirectory(handle, 'supplementals');
+    const currentPaths = [];
+    const usedPdfNames = new Set();
+    const usedSupplementNames = new Set();
+
+    for (const paper of S.papers) {
+      if (paper.hasPdf && paper.pdfId) {
+        const rec = await getPdfBlob(paper.pdfId);
+        if (rec && rec.blob) {
+          const ext = getFileExtension(paper.pdfOriginalName || paper.pdfName || rec.name || 'paper.pdf', rec.type || 'application/pdf', 'pdf');
+          const storedName = dedupeFileName(buildStoredFileName(paper, { kind: 'pdf', ext }), usedPdfNames);
+          await writeBlobToFile(pdfDir, storedName, rec.blob);
+          paper.pdfName = storedName;
+          paper.pdfPath = `pdfs/${storedName}`;
+          currentPaths.push(paper.pdfPath);
+        }
+      }
+
+      for (const meta of (paper.supplementalFiles || [])) {
+        const rec = await getMaterialBlob(meta.id);
+        if (rec && rec.blob) {
+          const ext = getFileExtension(meta.originalName || meta.name || rec.name || 'attachment', rec.type || meta.type || 'application/octet-stream', 'bin');
+          const slot = Number.isFinite(meta.slot) ? meta.slot : 1;
+          const storedName = dedupeFileName(buildStoredFileName(paper, { kind: 'supplement', slot, ext }), usedSupplementNames);
+          await writeBlobToFile(suppDir, storedName, rec.blob);
+          meta.name = storedName;
+          meta.path = `supplementals/${storedName}`;
+          currentPaths.push(meta.path);
+        }
+      }
+    }
+
+    const exportData = {
+      savedAt: new Date().toISOString(),
+      papers: S.papers,
+      collections: S.collections
+    };
+    await writeJsonFile(handle, 'bunken-library.json', exportData);
+
+    const oldPathsRaw = await getSetting('syncedPaths');
+    const oldPaths = Array.isArray(oldPathsRaw) ? oldPathsRaw : [];
+    for (const oldPath of oldPaths) {
+      if (!currentPaths.includes(oldPath)) {
+        try { await removeRelativePath(handle, oldPath); } catch (_) {}
+      }
+    }
+
+    STORAGE_STATE.lastSyncedAt = new Date().toISOString();
+    setSyncBaseline({ papers: S.papers, collections: S.collections });
+    STORAGE_STATE.remoteLastSeenSavedAt = exportData.savedAt;
+    STORAGE_STATE.remoteLastSeenFingerprint = stableFingerprint(exportData);
+    await putSetting('syncedPaths', currentPaths);
+    await putSetting('lastSyncedAt', STORAGE_STATE.lastSyncedAt);
+    await putSetting('storageFolderName', STORAGE_STATE.folderName || handle.name || '選択済みフォルダ');
+    await putSetting('syncBaseline', STORAGE_STATE.syncBaseline);
+
+    STORAGE_STATE.syncSuspended = true;
+    try { save(); } finally { STORAGE_STATE.syncSuspended = false; }
+    if (STORAGE_STATE.realtimeSync) startRemoteWatch();
+    await refreshRemoteDiff();
+    render();
+    if (showToast) toast('保存先フォルダへ同期しました');
+    return true;
+  })();
+
+  try {
+    return await STORAGE_STATE.syncInFlight;
+  } finally {
+    STORAGE_STATE.syncInFlight = null;
+  }
+}
+
+/* ============================================================
+   HELPERS
+============================================================ */
+function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2,9); }
+
+function h(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function decodeEntities(s) {
+  const t = document.createElement('textarea');
+  t.innerHTML = String(s ?? '');
+  return t.value;
+}
+
+function plainText(s) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = decodeEntities(s);
+  return (tpl.content.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
+function richInline(s) {
+  const allowed = new Set(['I','EM','B','STRONG','SUB','SUP']);
+  const tpl = document.createElement('template');
+  tpl.innerHTML = decodeEntities(s);
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return;
+    if (node.nodeType !== Node.ELEMENT_NODE) { node.remove(); return; }
+    Array.from(node.childNodes).forEach(walk);
+    if (!allowed.has(node.tagName)) {
+      node.replaceWith(document.createTextNode(node.textContent || ''));
+      return;
+    }
+    while (node.attributes.length) node.removeAttribute(node.attributes[0].name);
+  };
+  Array.from(tpl.content.childNodes).forEach(walk);
+  return tpl.innerHTML;
+}
+
+// For use in data attributes — escape single quotes
+function oa(s) { return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+function sanitizeFilePart(s) {
+  const txt = plainText(s || '').normalize('NFKC');
+  return txt
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[.]+$/g, '')
+    .trim()
+    .slice(0, 80) || 'unknown';
+}
+
+function primaryAuthorName(paper) {
+  const raw = (paper.authors && paper.authors[0]) ? paper.authors[0] : 'unknown';
+  const head = raw.includes(',') ? raw.split(',')[0] : raw.split(/\s+/).filter(Boolean).slice(-1)[0];
+  return sanitizeFilePart(head || 'unknown');
+}
+
+function getFileExtension(name, mimeType = '', fallback = 'bin') {
+  const fromName = String(name || '').match(/\.([A-Za-z0-9]{1,10})$/);
+  if (fromName) return fromName[1].toLowerCase();
+  if ((mimeType || '').includes('pdf')) return 'pdf';
+  return fallback;
+}
+
+function buildStoredFileName(paper, { kind = 'pdf', slot = 1, ext = 'pdf' } = {}) {
+  const base = [
+    primaryAuthorName(paper),
+    sanitizeFilePart(paper.title || 'untitled'),
+    sanitizeFilePart(paper.journal || 'unknown-journal'),
+    sanitizeFilePart(paper.year || 'unknown-year')
+  ].join('_');
+  const suffix = kind === 'supplement' ? `_S${slot}` : '';
+  return `${base}${suffix}.${ext}`;
+}
+
+function dedupeFileName(fileName, usedNames) {
+  if (!usedNames) return fileName;
+  if (!usedNames.has(fileName)) {
+    usedNames.add(fileName);
+    return fileName;
+  }
+  const m = String(fileName).match(/^(.*?)(\.([^.]+))?$/);
+  const stem = m ? m[1] : fileName;
+  const dotExt = m && m[2] ? m[2] : '';
+  let n = 2;
+  let candidate = `${stem}_${n}${dotExt}`;
+  while (usedNames.has(candidate)) {
+    n += 1;
+    candidate = `${stem}_${n}${dotExt}`;
+  }
+  usedNames.add(candidate);
+  return candidate;
+}
+
+function nextSupplementSlot(paper) {
+  const used = new Set((paper.supplementalFiles || []).map(f => Number.isFinite(f.slot) ? f.slot : null).filter(v => v != null));
+  let slot = 1;
+  while (used.has(slot)) slot += 1;
+  return slot;
+}
+
+function fmtSyncTime(iso) {
+  if (!iso) return '未同期';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '未同期';
+  return d.toLocaleString('ja-JP');
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('on'), 2600);
+}
+
+function safeDoiUrl(doi) {
+  const cleaned = sanitizeText(doi, 256);
+  if (!cleaned) return '';
+  return `https://doi.org/${encodeURIComponent(cleaned).replace(/%2F/g, '/')}`;
+}
+
+function safeArxivUrl(arxivId) {
+  const cleaned = sanitizeText(arxivId, 128).replace(/\s+/g, '');
+  if (!cleaned) return '';
+  return `https://arxiv.org/abs/${encodeURIComponent(cleaned).replace(/%2F/g, '/')}`;
+}
+
+/* ============================================================
+   BIBTEX KEY
+============================================================ */
+function bKey(p) {
+  const skip = /^(the|and|for|with|from|into|over|upon|this|that|a|an|in|on|of|to|at|by|is)$/i;
+  const fa = (p.authors && p.authors[0])
+    ? p.authors[0].split(',')[0].trim().replace(/\s/g,'').toLowerCase().slice(0,10)
+    : 'unknown';
+  const yr = p.year || 'xxxx';
+  const titleText = plainText(p.title || '');
+  const tw = titleText.split(/\s+/)
+    .find(w => w.length > 3 && !skip.test(w)) || titleText.split(/\s+/)[0] || 'paper';
+  return fa + yr + tw.replace(/[^a-zA-Z0-9]/g,'').toLowerCase().slice(0,8);
+}
+
+/* ============================================================
+   BIBTEX PARSER
+============================================================ */
+function parseBib(txt) {
+  const tm = txt.match(/@(\w+)\s*\{/i);
+  if (!tm) return null;
+  const type = tm[1].toLowerCase();
+  const km = txt.match(/@\w+\s*\{\s*([^,\s]+)/);
+  const bk = km ? km[1] : '';
+  const fields = {};
+  const re = /(\w+)\s*=\s*(?:\{((?:[^{}]|\{[^{}]*\})*)\}|"([^"]*)"|(\d+))/g;
+  let m;
+  while ((m = re.exec(txt)) !== null) {
+    fields[m[1].toLowerCase()] = (m[2]!=null?m[2]:(m[3]!=null?m[3]:m[4])).trim();
+  }
+  const authors = fields.author ? fields.author.split(' and ').map(a=>a.trim()).filter(Boolean) : [];
+  const typeMap = { inproceedings:'inproceedings', conference:'inproceedings', book:'book', misc:'misc', phdthesis:'phdthesis', mastersthesis:'mastersthesis' };
+  const pt = typeMap[type] || 'article';
+  return {
+    id: uid(), type: pt, bibtexKey: bk,
+    title: fields.title||'', authors,
+    year: parseInt(fields.year)||null,
+    journal: fields.journal||fields.booktitle||fields.publisher||'',
+    volume: fields.volume||'', number: fields.number||'', pages: fields.pages||'',
+    publisher: fields.publisher||'', doi: fields.doi||'',
+    arxivId: fields.eprint||'', url: fields.url||'',
+    abstract: fields.abstract||'', citationCount: null,
+    tags: [], collections: [], starred: false, readStatus: 'unread', notes: '',
+    addedAt: new Date().toISOString(),
+    pdfId: '', pdfName: '', pdfOriginalName: '', pdfPath: '', hasPdf: false, supplementalFiles: []
+  };
+}
+
+/* ============================================================
+   BIBTEX GENERATOR
+============================================================ */
+function genBib(p) {
+  const tMap = { article:'article', inproceedings:'inproceedings', book:'book', preprint:'misc', misc:'misc', phdthesis:'phdthesis', mastersthesis:'mastersthesis' };
+  const t = tMap[p.type]||'misc';
+  const k = p.bibtexKey || bKey(p);
+  const lines = [`@${t}{${k},`];
+  const f = (n,v) => { if (v) lines.push(`  ${n} = {${v}},`); };
+  f('title', p.title);
+  if (p.authors&&p.authors.length) lines.push(`  author = {${p.authors.join(' and ')}},`);
+  f('year', p.year);
+  const jf = p.type==='inproceedings'?'booktitle':'journal';
+  f(jf, p.journal);
+  f('volume', p.volume); f('number', p.number); f('pages', p.pages);
+  f('publisher', p.publisher); f('doi', p.doi); f('url', p.url);
+  if (p.arxivId) lines.push(`  eprint = {${p.arxivId}},`);
+  f('abstract', p.abstract);
+  lines.push('}');
+  return lines.join('\n');
+}
+
+/* ============================================================
+   CROSSREF FETCH
+============================================================ */
+async function fetchDOI(raw) {
+  const doi = raw.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i,'');
+  const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`);
+  if (!res.ok) throw new Error('DOIが見つかりません（CrossRef）');
+  const { message: m } = await res.json();
+  const authors = (m.author||[]).map(a => a.family&&a.given ? `${a.family}, ${a.given}` : a.family||a.name||'').filter(Boolean);
+  const dp = m['published-print']?.['date-parts']?.[0] || m['published-online']?.['date-parts']?.[0] || m['published']?.['date-parts']?.[0];
+  return {
+    id: uid(), type: m.type==='proceedings-article'?'inproceedings':'article', bibtexKey: '',
+    title: (m.title||[''])[0], authors, year: dp?dp[0]:null,
+    journal: (m['container-title']||[])[0]||m.publisher||'',
+    volume: m.volume||'', number: m.issue||'', pages: m.page||'',
+    publisher: m.publisher||'', doi: m.DOI||doi, arxivId: '', url: m.URL||'',
+    abstract: m.abstract ? m.abstract.replace(/<[^>]+>/g,'') : '',
+    citationCount: m['is-referenced-by-count']??null,
+    tags: [], collections: [], starred: false, readStatus: 'unread', notes: '',
+    addedAt: new Date().toISOString()
+  };
+}
+
+/* ============================================================
+   ARXIV FETCH
+============================================================ */
+async function fetchArxiv(raw) {
+  const id = raw.trim()
+    .replace(/^https?:\/\/arxiv\.org\/(abs|pdf)\//i,'')
+    .replace(/v\d+$/,'');
+  const res = await fetch(`https://export.arxiv.org/api/query?id_list=${id}`);
+  if (!res.ok) throw new Error('arXivに接続できません');
+  const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
+  const entry = xml.querySelector('entry');
+  if (!entry) throw new Error('arXiv IDが見つかりません');
+  const title = entry.querySelector('title')?.textContent?.trim().replace(/\s+/g,' ')||'';
+  const summary = entry.querySelector('summary')?.textContent?.trim().replace(/\s+/g,' ')||'';
+  const published = entry.querySelector('published')?.textContent||'';
+  const year = published ? parseInt(published.slice(0,4)) : null;
+  const authors = Array.from(entry.querySelectorAll('author name')).map(n => {
+    const nm = n.textContent.trim(), pts = nm.split(' ');
+    return pts.length >= 2 ? `${pts[pts.length-1]}, ${pts.slice(0,-1).join(' ')}` : nm;
+  });
+  const doi = entry.querySelector('doi')?.textContent?.trim()||'';
+  const jref = entry.querySelector('journal_ref')?.textContent?.trim()||'';
+  return {
+    id: uid(), type: 'preprint', bibtexKey: '', title, authors, year,
+    journal: jref||'arXiv', volume:'', number:'', pages:'', publisher:'',
+    doi, arxivId: id, url: `https://arxiv.org/abs/${id}`, abstract: summary,
+    citationCount: null, tags: [], collections: [], starred: false,
+    readStatus: 'unread', notes: '', addedAt: new Date().toISOString(),
+    pdfId: '', pdfName: '', pdfOriginalName: '', pdfPath: '', hasPdf: false, supplementalFiles: []
+  };
+}
+
+/* ============================================================
+   PDF METADATA
+============================================================ */
+async function extractPDF(file) {
+  const pdfJs = await getPdfJsLib();
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfJs.getDocument({ data: buf }).promise;
+  const meta = await pdf.getMetadata();
+  let title = meta.info?.Title || '';
+  let author = meta.info?.Author || '';
+  if (!title) {
+    const page = await pdf.getPage(1);
+    const tc = await page.getTextContent();
+    let maxFs = 0, best = '';
+    for (const item of tc.items.slice(0, 15)) {
+      if (item.str.trim().length > 5) {
+        const fs = Math.abs(item.transform[0]);
+        if (fs > maxFs) { maxFs = fs; best = item.str.trim(); }
+      }
+    }
+    title = best;
+  }
+  const authors = author ? author.split(/[,;]/).map(a=>a.trim()).filter(Boolean) : [];
+  return normalizePaper({
+    id: uid(), type: 'article', bibtexKey: '', title, authors,
+    year: null, journal:'', volume:'', number:'', pages:'', publisher:'',
+    doi:'', arxivId:'', url:'', abstract:'', citationCount: null,
+    tags: [], collections: [], starred: false, readStatus: 'unread', notes: '',
+    addedAt: new Date().toISOString(),
+    pdfId: '', pdfName: file.name || '', pdfOriginalName: file.name || '', pdfPath: '', hasPdf: false,
+    supplementalFiles: []
+  });
+}
+function filtered() {
+  let pp = [...S.papers];
+  if (S.view === 'starred')        pp = pp.filter(p => p.starred);
+  else if (S.view === 'unread')    pp = pp.filter(p => p.readStatus==='unread');
+  else if (S.view === 'reading')   pp = pp.filter(p => p.readStatus==='reading');
+  else if (S.view === 'read')      pp = pp.filter(p => p.readStatus==='read');
+  else if (S.view.startsWith('col:')) { const c=S.view.slice(4); pp=pp.filter(p=>(p.collections||[]).includes(c)); }
+  else if (S.view.startsWith('tag:')) { const t=S.view.slice(4); pp=pp.filter(p=>(p.tags||[]).includes(t)); }
+
+  if (S.filters.search) {
+    const q = S.filters.search.toLowerCase();
+    pp = pp.filter(p =>
+      plainText(p.title||'').toLowerCase().includes(q) ||
+      (p.authors||[]).join(' ').toLowerCase().includes(q) ||
+      (p.abstract||'').toLowerCase().includes(q) ||
+      (p.tags||[]).join(' ').toLowerCase().includes(q) ||
+      (p.notes||'').toLowerCase().includes(q) ||
+      (p.journal||'').toLowerCase().includes(q)
+    );
+  }
+  if (S.filters.author) {
+    const a = S.filters.author.toLowerCase();
+    pp = pp.filter(p => (p.authors||[]).join(' ').toLowerCase().includes(a));
+  }
+  if (S.filters.year)    pp = pp.filter(p => String(p.year) === S.filters.year);
+  if (S.filters.journal) {
+    const j = S.filters.journal.toLowerCase();
+    pp = pp.filter(p => (p.journal||'').toLowerCase().includes(j));
+  }
+
+  pp.sort((a,b) => {
+    switch(S.sortBy) {
+      case 'year':         return (b.year||0)-(a.year||0);
+      case 'title':        return (a.title||'').localeCompare(b.title||'');
+      case 'citationCount':return (b.citationCount||0)-(a.citationCount||0);
+      default:             return new Date(b.addedAt)-new Date(a.addedAt);
+    }
+  });
+  return pp;
+}
+
+/* ============================================================
+   RENDER
+============================================================ */
+function render() { renderSidebar(); renderList(); renderDetail(); updateFilters(); }
+
+function renderSidebar() {
+  const cnt = v => S.papers.filter(v).length;
+  const all=S.papers.length, star=cnt(p=>p.starred),
+        un=cnt(p=>p.readStatus==='unread'), re=cnt(p=>p.readStatus==='reading'),
+        rd=cnt(p=>p.readStatus==='read');
+
+  const tagCounts = {};
+  S.papers.forEach(p => (p.tags||[]).forEach(t => { tagCounts[t]=(tagCounts[t]||0)+1; }));
+
+  const item = (view, ico, lbl, cnt) => {
+    const a = S.view===view?'active':'';
+    return `<div class="side-item ${a}" data-action="set-view" data-view="${h(view)}">
+      <span class="ico">${ico}</span><span class="lbl">${h(lbl)}</span><span class="cnt">${cnt}</span></div>`;
+  };
+
+  const storageName = STORAGE_STATE.available
+    ? (STORAGE_STATE.folderName || 'ブラウザ内に保存')
+    : 'このブラウザでは未対応';
+  const realtimeLabel = STORAGE_STATE.realtimeSync ? 'ON' : 'OFF';
+  const storageStatus = !STORAGE_STATE.available
+    ? '保存先フォルダ指定は Chrome / Edge 系で利用できます'
+    : STORAGE_STATE.folderHandle
+      ? `同期先: ${h(storageName)}<br>最終同期: ${h(fmtSyncTime(STORAGE_STATE.lastSyncedAt))}<br>リアルタイム同期: ${h(realtimeLabel)}`
+      : `現在はブラウザ内に保存中です<br>リアルタイム同期: ${h(realtimeLabel)}`;
+  const remoteBadge = formatDiffBadge(STORAGE_STATE.remoteDiff);
+  const localBadge = formatDiffBadge(STORAGE_STATE.localDiff);
+
+  let html = `
+    <div class="side-logo">Bunken<span></div>
+    <div class="side-sec">
+      <div class="side-sec-hd">保存先</div>
+      <div class="side-storage">
+        <div class="side-storage-name">${h(storageName)}</div>
+        <div class="side-storage-status">${storageStatus}</div>
+        ${STORAGE_STATE.available ? `<div class="side-btn-row"><button class="side-btn" type="button" data-action="choose-storage-folder">📂 保存先フォルダを選択</button></div>
+        <div class="side-btn-row"><button class="side-btn" type="button" data-action="toggle-realtime-sync">${STORAGE_STATE.realtimeSync ? '🟢 リアルタイム同期 ON' : '⚪ リアルタイム同期 OFF'}</button></div>
+        ${STORAGE_STATE.folderHandle ? `<div class="side-btn-row"><button class="side-btn side-btn-flex" type="button" data-action="import-from-folder"><span class="side-btn-label">📥 保存先から読み込む</span>${remoteBadge ? `<span class="diff-chip diff-remote" title="他のデバイスでの変更: ${h(remoteBadge)}">${h(remoteBadge)}</span>` : ''}</button></div>
+        <div class="side-btn-row"><button class="side-btn side-btn-flex" type="button" data-action="sync-to-folder"><span class="side-btn-label">💾 保存先へ書き出し</span>${localBadge ? `<span class="diff-chip diff-local" title="このブラウザで未同期の変更: ${h(localBadge)}">${h(localBadge)}</span>` : ''}</button></div>
+        <div class="side-btn-row"><button class="side-btn" type="button" data-action="clear-storage-folder">↩ ブラウザ保存に戻す</button></div>` : ''}` : ''}
+      </div>
+    </div>
+    <div class="side-sec">
+      ${item('all','📚','すべて',all)}
+      ${item('starred','⭐','スター付き',star)}
+      ${item('unread','🔴','未読',un)}
+      ${item('reading','🟢','読書中',re)}
+      ${item('read','✓','読了',rd)}
+    </div>
+    <div class="side-sec">
+      <div class="side-sec-hd">コレクション<button type="button" data-action="add-collection" title="コレクション追加">＋</button></div>
+      ${S.collections.map((c, idx) => {
+        const cc = S.papers.filter(p=>(p.collections||[]).includes(c.id)).length;
+        const a = S.view==='col:'+c.id?'active':'';
+        return `<div class="side-item ${a}" data-action="set-view" data-view="${h(`col:${c.id}`)}">
+          <span class="ico">📁</span><span class="lbl">${h(c.name)}</span>
+          <span class="side-actions">
+            <button type="button" class="side-act" data-action="move-collection-up" data-id="${h(c.id)}" title="上へ移動" ${idx===0?'disabled':''}>▲</button>
+            <button type="button" class="side-act" data-action="move-collection-down" data-id="${h(c.id)}" title="下へ移動" ${idx===S.collections.length-1?'disabled':''}>▼</button>
+            <button type="button" class="side-act" data-action="rename-collection" data-id="${h(c.id)}" title="コレクション名を編集">✎</button>
+            <button type="button" class="side-act" data-action="delete-collection" data-id="${h(c.id)}" title="コレクションを削除">🗑</button>
+            <span class="cnt">${cc}</span>
+          </span></div>`;
+      }).join('')}
+      ${!S.collections.length?'<div class="side-empty">なし</div>':''}
+    </div>
+    <div class="side-sec">
+      <div class="side-sec-hd">タグ</div>
+      ${Object.entries(tagCounts).sort((a,b)=>b[1]-a[1]).map(([t,c]) => {
+        const a = S.view==='tag:'+t?'active':'';
+        return `<div class="side-item ${a}" data-action="set-view" data-view="${h(`tag:${t}`)}">
+          <span class="ico" style="color:var(--tag-fg);opacity:1;font-size:10px;">#</span>
+          <span class="lbl">${h(t)}</span><span class="cnt">${c}</span></div>`;
+      }).join('')}
+      ${!Object.keys(tagCounts).length?'<div class="side-empty">なし</div>':''}
+    </div>`;
+  document.getElementById('sidebar').innerHTML = html;
+}
+function renderList() {
+  const pp = filtered();
+  const labels = { all:'すべての文献', starred:'スター付き', unread:'未読', reading:'読書中', read:'読了' };
+  let title = labels[S.view] || '';
+  if (S.view.startsWith('col:')) { const c=S.collections.find(c=>c.id===S.view.slice(4)); title=c?`📁 ${c.name}`:'コレクション'; }
+  else if (S.view.startsWith('tag:')) title = `# ${S.view.slice(4)}`;
+  document.getElementById('list-title').textContent = title;
+
+  if (!pp.length) {
+    document.getElementById('paper-list').innerHTML = `<div class="empty-list">
+      <div class="ei">📄</div>
+      <div>${!S.papers.length?'「＋ 追加」から文献を登録しましょう':'条件に一致する文献がありません'}</div>
+    </div>`;
+    return;
+  }
+
+  const readLbl = { unread:'未読', reading:'読書中', read:'読了' };
+  document.getElementById('paper-list').innerHTML = pp.map(p => {
+    const auStr = (p.authors||[]).length
+      ? (p.authors||[]).slice(0,3).map(a=>a.split(',')[0].trim()).join(', ') + (p.authors.length>3?' ほか':'')
+      : '著者不明';
+    const rs = p.readStatus||'unread';
+    const tags = (p.tags||[]).slice(0,3).map(t=>`<span class="tag-pill">${h(t)}</span>`).join('');
+    const cit = p.citationCount!=null ? `<span class="pi-cit">被引用 ${p.citationCount}</span>` : '';
+    const sel = S.selectedId===p.id?'sel':'';
+    return `<div class="paper-item ${sel}" data-action="select-paper" data-id="${h(p.id)}">
+      <div class="pi-top">
+        <button type="button" class="pi-star ${p.starred?'on':''}" data-action="toggle-star" data-id="${h(p.id)}">${p.starred?'★':'☆'}</button>
+        <div class="pi-title">${richInline(p.title||'（タイトルなし）')}</div>
+        <div class="pi-year">${p.year||'—'}</div>
+      </div>
+      <div class="pi-meta">${h(auStr)}${p.journal?` · ${h(p.journal)}`:''}</div>
+      <div class="pi-bot"><span class="badge ${rs}">${readLbl[rs]}</span>${tags}${cit}</div>
+    </div>`;
+  }).join('');
+}
+function renderDetail() {
+  const pane = document.getElementById('detail-pane');
+  if (!S.selectedId) {
+    pane.innerHTML = `<div class="detail-ph"><div class="phi">📖</div><div>文献を選択してください</div></div>`;
+    return;
+  }
+  const p = S.papers.find(q=>q.id===S.selectedId);
+  if (!p) { pane.innerHTML = ''; return; }
+
+  const typeLabels = { article:'Journal Article', inproceedings:'Conference Paper', preprint:'Preprint', book:'Book', misc:'Other', phdthesis:'PhD Thesis', mastersthesis:'Master\'s Thesis' };
+  const auStr = (p.authors||[]).join(', ') || '—';
+  const venParts = [p.journal, p.volume?`vol.${p.volume}`:'', p.number?`no.${p.number}`:'', p.pages].filter(Boolean);
+  const ven = venParts.join(' · ');
+  const doiUrl = safeDoiUrl(p.doi);
+  const arxivUrl = safeArxivUrl(p.arxivId);
+  const customUrl = p.url && !p.doi && !p.arxivId ? sanitizeExternalUrl(p.url) : '';
+
+  const links = [
+    doiUrl ? `<a class="d-link" href="${h(doiUrl)}" target="_blank" rel="noopener noreferrer">DOI</a>` : '',
+    arxivUrl ? `<a class="d-link" href="${h(arxivUrl)}" target="_blank" rel="noopener noreferrer">arXiv</a>` : '',
+    customUrl ? `<a class="d-link" href="${h(customUrl)}" target="_blank" rel="noopener noreferrer">URL</a>` : '',
+    p.hasPdf ? `<a class="d-link" href="#" data-action="open-pdf" data-id="${h(p.id)}">PDF を開く</a>` : ''
+  ].filter(Boolean).join('');
+
+  const colOpts = `<option value="">—</option>` +
+    S.collections.map(c=>`<option value="${h(c.id)}" ${(p.collections||[]).includes(c.id)?'selected':''}>${h(c.name)}</option>`).join('');
+
+  const tagsHtml = (p.tags||[]).map(t =>
+    `<span class="tag-edit">${h(t)}<button type="button" data-action="remove-tag" data-id="${h(p.id)}" data-tag="${h(t)}">✕</button></span>`
+  ).join('');
+
+  const sbtn = (s, lbl) => {
+    const a = p.readStatus===s ? `on-${s}` : '';
+    return `<button type="button" class="s-btn ${a}" data-action="set-status" data-id="${h(p.id)}" data-status="${s}">${lbl}</button>`;
+  };
+
+  const cit = p.citationCount!=null
+    ? `<div class="d-cit"><strong>${p.citationCount}</strong> 被引用数</div>` : '';
+
+  pane.innerHTML = `<div class="detail-wrap">
+    <button type="button" class="d-star ${p.starred?'on':''}" data-action="toggle-star" data-id="${h(p.id)}">${p.starred?'★':'☆'}</button>
+    <div class="d-type">${typeLabels[p.type]||p.type||'—'}</div>
+    <div class="d-title">${richInline(p.title||'（タイトルなし）')}</div>
+    <div class="d-authors">${h(auStr)}</div>
+    ${ven?`<div class="d-venue">${h(ven)}</div>`:''}
+    ${links?`<div class="d-links">${links}</div>`:''}
+    ${p.hasPdf?`<div class="d-venue">添付PDF: ${h(p.pdfName||'stored.pdf')}${p.pdfPath?` · ${h(p.pdfPath)}`:''}</div>`:''}
+    ${(p.supplementalFiles||[]).length?`<div class="d-venue">補足資料: ${(p.supplementalFiles||[]).length}件</div>`:''}
+    ${cit}
+    ${p.abstract?`
+      <hr class="d-div">
+      <div class="d-sh">Abstract</div>
+      <div class="d-abstract ${S.absExpanded?'':'coll'}" id="d-abs">${h(p.abstract)}</div>
+      <button type="button" class="expand-btn" data-action="toggle-abstract">${S.absExpanded?'折りたたむ ▲':'続きを表示 ▼'}</button>
+    `:''}
+    <hr class="d-div">
+    <div class="d-sh">タグ</div>
+    <div class="tags-row">${tagsHtml}
+      <input class="tag-in" id="tag-in" data-action="tag-input" data-id="${h(p.id)}" placeholder="追加して Enter…">
+    </div>
+    <hr class="d-div">
+    <div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;">
+      <div>
+        <div class="d-sh" style="margin-bottom:6px;">読書ステータス</div>
+        <div class="status-row">${sbtn('unread','未読')}${sbtn('reading','読書中')}${sbtn('read','読了')}</div>
+      </div>
+      ${S.collections.length?`<div>
+        <div class="d-sh" style="margin-bottom:6px;">コレクション</div>
+        <select class="col-select" data-action="set-collection" data-id="${h(p.id)}">${colOpts}</select>
+      </div>`:''}
+    </div>
+    <hr class="d-div">
+    <div class="d-sh">PDF / 添付ファイル</div>
+    <div class="d-actions">
+      <button type="button" class="btn-sec" data-action="prompt-attach-pdf" data-id="${h(p.id)}">${p.hasPdf?'🔁 PDFを差し替え':'📎 PDFを添付'}</button>
+      ${p.hasPdf?`<button type="button" class="btn-sec" data-action="open-pdf" data-id="${h(p.id)}">📄 PDFを開く</button><button type="button" class="btn-del" data-action="remove-pdf" data-id="${h(p.id)}">PDFを外す</button>`:''}
+    </div>
+    <div class="d-sh" style="margin-top:14px;">Supplemental materials</div>
+    ${(p.supplementalFiles||[]).length ? `<div class="d-links">${(p.supplementalFiles||[]).map(f => `<a class="d-link" href="#" data-action="open-supplement" data-id="${h(p.id)}" data-file-id="${h(f.id)}">${h(f.name)}</a>${f.path?`<span class="d-link" style="pointer-events:none;">${h(f.path)}</span>`:''}<a class="d-link" href="#" data-action="remove-supplement" data-id="${h(p.id)}" data-file-id="${h(f.id)}">削除</a>`).join('')}</div>` : `<div class="d-venue">補足資料: なし</div>`}
+    <div class="d-actions">
+      <button type="button" class="btn-sec" data-action="prompt-attach-supplement" data-id="${h(p.id)}">📎 補足資料を追加</button>
+    </div>
+    <hr class="d-div">
+    <div class="d-sh">メモ・ノート</div>
+    <textarea class="notes-ta" data-action="notes-change" data-id="${h(p.id)}" placeholder="メモを入力…">${h(p.notes||'')}</textarea>
+    <hr class="d-div">
+    <div class="d-actions">
+      <button type="button" class="btn-sec" data-action="open-edit-modal" data-id="${h(p.id)}">✏ 編集</button>
+      <button type="button" class="btn-sec" data-action="show-bib" data-id="${h(p.id)}">{ } BibTeX</button>
+      <button type="button" class="btn-del" data-action="delete-paper" data-id="${h(p.id)}">🗑 削除</button>
+    </div>
+  </div>`;
+}
+function updateFilters() {
+  const set = fn => { const s = new Set(); S.papers.forEach(fn(s)); return s; };
+  const authors = new Set(); S.papers.forEach(p=>(p.authors||[]).forEach(a=>authors.add(a.split(',')[0].trim())));
+  const years   = new Set(); S.papers.forEach(p=>{ if(p.year) years.add(String(p.year)); });
+  const journals= new Set(); S.papers.forEach(p=>{ if(p.journal) journals.add(p.journal); });
+
+  const upd = (id, vals, cur) => {
+    document.getElementById(id).innerHTML = `<option value="">${{fa:'著者…',fy:'年…',fj:'誌名…'}[id]}</option>` +
+      [...vals].sort().reverse().map(v=>`<option value="${h(v)}"${cur===v?' selected':''}>${h(v)}</option>`).join('');
+  };
+  upd('fa', authors, S.filters.author);
+  upd('fy', years,   S.filters.year);
+  upd('fj', journals,S.filters.journal);
+}
+
+/* ============================================================
+   ACTIONS
+============================================================ */
+function setView(v)     { S.view=v; S.selectedId=null; render(); }
+function selectPaper(id){ S.selectedId=id; S.absExpanded=false; renderList(); renderDetail(); }
+function toggleStar(id) { const p=S.papers.find(q=>q.id===id); if(p){p.starred=!p.starred;save();render();} }
+function setStatus(id,s){ const p=S.papers.find(q=>q.id===id); if(p){p.readStatus=s;save();render();} }
+function toggleAbs()    { S.absExpanded=!S.absExpanded; renderDetail(); }
+
+function addTag(id, tag) {
+  tag = tag.trim().replace(/,/g,'').replace(/;/g,'').slice(0,30);
+  if (!tag) return;
+  const p = S.papers.find(q=>q.id===id);
+  if (p && !(p.tags||[]).includes(tag)) { p.tags.push(tag); save(); render(); }
+}
+function rmTagBtn(btn) {
+  const id=btn.dataset.id, tag=btn.dataset.tag;
+  const p=S.papers.find(q=>q.id===id);
+  if (p) { p.tags=p.tags.filter(t=>t!==tag); save(); render(); }
+}
+function tagKeydown(e, id) {
+  if (e.key==='Enter'||e.key===',') { addTag(id,e.target.value); e.target.value=''; e.preventDefault(); }
+}
+function tagBlur(el, id) { if(el.value.trim()){addTag(id,el.value);el.value='';} }
+
+function setCol(id, colId) {
+  const p=S.papers.find(q=>q.id===id);
+  if (p) { p.collections=colId?[colId]:[]; save(); render(); }
+}
+function updNotes(id, v) { const p=S.papers.find(q=>q.id===id); if(p){p.notes=v;save();} }
+
+async function delPaper(id) {
+  if (!confirm('この文献を削除しますか？')) return;
+  const paper = S.papers.find(p=>p.id===id);
+  if (paper?.hasPdf) {
+    try { await deletePdfBlob(paper.pdfId || id); } catch(e) { console.error(e); }
+    if (STORAGE_STATE.folderHandle && paper.pdfPath) { try { await removeRelativePath(STORAGE_STATE.folderHandle, paper.pdfPath); } catch(e) { console.error(e); } }
+  }
+  for (const fileMeta of (paper?.supplementalFiles || [])) {
+    try { await deleteMaterialBlob(fileMeta.id); } catch(e) { console.error(e); }
+    if (STORAGE_STATE.folderHandle && fileMeta.path) { try { await removeRelativePath(STORAGE_STATE.folderHandle, fileMeta.path); } catch(e) { console.error(e); } }
+  }
+  S.papers = S.papers.filter(p=>p.id!==id);
+  if (S.selectedId===id) S.selectedId=null;
+  save(); render(); toast('文献を削除しました');
+}
+
+function addCollection() {
+  const name = prompt('コレクション名:');
+  if (name && name.trim()) { S.collections.push(normalizeCollection({id:uid(),name:name.trim()})); save(); render(); }
+}
+
+function renameCollection(id) {
+  const collection = S.collections.find(c => c.id === id);
+  if (!collection) return;
+  const name = prompt('新しいコレクション名:', collection.name);
+  if (name == null) return;
+  const trimmed = name.trim();
+  if (!trimmed || trimmed === collection.name) return;
+  collection.name = sanitizeText(trimmed, 80) || collection.name;
+  save(); render(); toast('コレクション名を更新しました');
+}
+
+function deleteCollection(id) {
+  const collection = S.collections.find(c => c.id === id);
+  if (!collection) return;
+  if (!confirm(`「${collection.name}」を削除しますか？`)) return;
+  S.collections = S.collections.filter(c => c.id !== id);
+  S.papers.forEach(p => {
+    if ((p.collections || []).includes(id)) p.collections = p.collections.filter(colId => colId !== id);
+  });
+  if (S.view === 'col:' + id) S.view = 'all';
+  save(); render(); toast('コレクションを削除しました');
+}
+
+function moveCollection(id, direction) {
+  const index = S.collections.findIndex(c => c.id === id);
+  if (index === -1) return;
+  const target = direction === 'up' ? index - 1 : index + 1;
+  if (target < 0 || target >= S.collections.length) return;
+  const next = [...S.collections];
+  [next[index], next[target]] = [next[target], next[index]];
+  S.collections = next;
+  save(); render();
+}
+
+function onSearch(q)       { S.filters.search=q;  renderList(); }
+function onFilter(k,v)     { S.filters[k]=v;       renderList(); }
+function onSort(v)         { S.sortBy=v;            renderList(); }
+
+function promptAttachPdf(id) {
+  const input = document.getElementById('pdf-attach-global');
+  if (!input) return;
+  input.value = '';
+  input.dataset.paperId = id;
+  input.click();
+}
+
+async function handleExistingPaperPdf(input) {
+  const id = input.dataset.paperId;
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!id || !file) return;
+  await attachPdfToPaper(id, file);
+}
+
+async function attachPdfToPaper(id, file) {
+  if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name || '')) {
+    toast('PDF ファイルを選択してください');
+    return;
+  }
+  const paper = S.papers.find(p => p.id === id);
+  if (!paper) return;
+  try {
+    let extracted = null;
+    try { extracted = await extractPDF(file); } catch (e) { console.warn(e); }
+    const pdfBlobId = paper.pdfId || id;
+    await putPdfBlob(pdfBlobId, file);
+    paper.pdfId = pdfBlobId;
+    paper.pdfOriginalName = file.name || 'document.pdf';
+    paper.hasPdf = true;
+    if (!plainText(paper.title) && extracted?.title) paper.title = extracted.title;
+    if ((!paper.authors || !paper.authors.length) && extracted?.authors?.length) paper.authors = extracted.authors;
+    paper.pdfName = buildStoredFileName(paper, { kind: 'pdf', ext: 'pdf' });
+    save();
+    if (STORAGE_STATE.folderHandle) await syncAllDataToChosenFolder(false);
+    render();
+    toast(STORAGE_STATE.folderHandle ? 'PDF を添付して保存先へコピーしました' : 'PDF を添付しました');
+  } catch (e) {
+    console.error(e);
+    alert('PDF の添付に失敗しました: ' + e.message);
+  }
+}
+
+async function removeAttachedPdf(id) {
+  const paper = S.papers.find(p => p.id === id);
+  if (!paper || !paper.hasPdf) return;
+  if (!confirm('添付PDFを外しますか？')) return;
+  try {
+    await deletePdfBlob(paper.pdfId || id);
+    if (STORAGE_STATE.folderHandle && paper.pdfPath) { try { await removeRelativePath(STORAGE_STATE.folderHandle, paper.pdfPath); } catch (e) { console.error(e); } }
+    paper.pdfId = '';
+    paper.pdfName = '';
+    paper.pdfOriginalName = '';
+    paper.pdfPath = '';
+    paper.hasPdf = false;
+    save();
+    render();
+    toast('PDF を外しました');
+  } catch (e) {
+    console.error(e);
+    alert('PDF の削除に失敗しました: ' + e.message);
+  }
+}
+
+function promptAttachSupplement(id) {
+  const input = document.getElementById('supp-attach-global');
+  if (!input) return;
+  input.value = '';
+  input.dataset.paperId = id;
+  input.click();
+}
+
+async function handleExistingPaperSupplement(input) {
+  const id = input.dataset.paperId;
+  const files = Array.from(input.files || []);
+  input.value = '';
+  if (!id || !files.length) return;
+  await attachSupplementToPaper(id, files);
+}
+
+async function attachSupplementToPaper(id, files) {
+  const paper = S.papers.find(p => p.id === id);
+  if (!paper) return;
+  const added = [];
+  try {
+    for (const file of files) {
+      const fileId = uid();
+      const slot = nextSupplementSlot(paper);
+      await putMaterialBlob(fileId, file);
+      const ext = getFileExtension(file.name || 'attachment', file.type || 'application/octet-stream', 'bin');
+      const meta = {
+        id: fileId,
+        name: buildStoredFileName(paper, { kind: 'supplement', slot, ext }),
+        originalName: file.name || 'attachment',
+        path: '',
+        type: file.type || 'application/octet-stream',
+        size: file.size || 0,
+        updatedAt: new Date().toISOString(),
+        slot
+      };
+      paper.supplementalFiles = [...(paper.supplementalFiles || []), meta];
+      added.push(meta);
+    }
+    save();
+    if (STORAGE_STATE.folderHandle) await syncAllDataToChosenFolder(false);
+    render();
+    toast(STORAGE_STATE.folderHandle ? `${added.length} 件の補足資料を追加して保存先へコピーしました` : `${added.length} 件の補足資料を追加しました`);
+  } catch (e) {
+    console.error(e);
+    for (const meta of added) {
+      try { await deleteMaterialBlob(meta.id); } catch (_) {}
+      paper.supplementalFiles = (paper.supplementalFiles || []).filter(f => f.id !== meta.id);
+    }
+    alert('補足資料の追加に失敗しました: ' + e.message);
+  }
+}
+
+async function removeSupplement(paperId, fileId) {
+  const paper = S.papers.find(p => p.id === paperId);
+  const fileMeta = (paper?.supplementalFiles || []).find(f => f.id === fileId);
+  if (!paper || !fileMeta) return;
+  if (!confirm(`「${fileMeta.name}」を削除しますか？`)) return;
+  try {
+    await deleteMaterialBlob(fileId);
+    if (STORAGE_STATE.folderHandle && fileMeta.path) { try { await removeRelativePath(STORAGE_STATE.folderHandle, fileMeta.path); } catch (e) { console.error(e); } }
+    paper.supplementalFiles = (paper.supplementalFiles || []).filter(f => f.id !== fileId);
+    save();
+    render();
+    toast('補足資料を削除しました');
+  } catch (e) {
+    console.error(e);
+    alert('補足資料の削除に失敗しました: ' + e.message);
+  }
+}
+
+async function openStoredPdf(id) {
+  try {
+    const paper = S.papers.find(p => p.id === id);
+    const rec = await getPdfBlob(paper?.pdfId || id);
+    if (!rec?.blob) { toast('保存済みの PDF が見つかりません'); return; }
+    const url = URL.createObjectURL(rec.blob);
+    window.open(url, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(url), 60 * 1000);
+  } catch (e) {
+    console.error(e);
+    toast('PDF を開けませんでした');
+  }
+}
+
+async function openStoredSupplement(paperId, fileId) {
+  try {
+    const rec = await getMaterialBlob(fileId);
+    if (!rec?.blob) { toast('補足資料が見つかりません'); return; }
+    const url = URL.createObjectURL(rec.blob);
+    window.open(url, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(url), 60 * 1000);
+  } catch (e) {
+    console.error(e);
+    toast('補足資料を開けませんでした');
+  }
+}
+
+/* ============================================================
+   MODAL
+============================================================ */
+function openAddModal() {
+  M.editId=null; M.pending=null;
+  document.getElementById('modal-hd-title').textContent='文献を追加';
+  document.getElementById('modal-save').textContent='追加';
+  document.getElementById('modal-tabs').style.display='';
+  switchTab('doi');
+  document.getElementById('add-modal').classList.add('open');
+}
+
+function openEditModal(id) {
+  const p=S.papers.find(q=>q.id===id);
+  if (!p) return;
+  M.editId=id; M.pending=JSON.parse(JSON.stringify(p));
+  document.getElementById('modal-hd-title').textContent='文献を編集';
+  document.getElementById('modal-save').textContent='保存';
+  document.getElementById('modal-tabs').style.display='none';
+  M.tab='manual'; renderModalBody();
+  document.getElementById('add-modal').classList.add('open');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  document.getElementById('modal-tabs').style.display='';
+  M.pending=null; M.editId=null;
+}
+
+function switchTab(t) {
+  M.tab=t;
+  const names=['doi','bibtex','manual','pdf'];
+  document.querySelectorAll('.m-tab').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
+  renderModalBody();
+}
+
+function renderModalBody() {
+  const el = document.getElementById('modal-body');
+  if (M.tab==='doi') {
+    el.innerHTML = `
+      <div class="fg">
+        <label class="fl">DOI または arXiv ID</label>
+        <div class="fetch-row">
+          <input class="fi" id="doi-in" placeholder="例: 10.1021/jacs.0c00000 または 2301.12345">
+          <button class="btn-fetch" type="button" id="fetch-btn" data-action="do-fetch">🔍 取得</button>
+        </div>
+        <div class="fs" id="fetch-st"></div>
+        <div class="preview" id="fetch-pv"></div>
+      </div>`;
+  } else if (M.tab==='bibtex') {
+    el.innerHTML = `
+      <div class="fg">
+        <label class="fl">BibTeX を貼り付け</label>
+        <textarea class="bta" id="bib-in" placeholder="@article{key,
+  title = {Title},
+  ..."></textarea>
+      </div>
+      <button class="btn-fetch" type="button" style="width:100%;justify-content:center;" data-action="parse-bib">解析する</button>
+      <div class="fs" id="bib-st"></div>
+      <div class="preview" id="bib-pv"></div>`;
+  } else if (M.tab==='manual') {
+    const p = M.pending || {};
+    const auStr = (p.authors||[]).join('; ');
+    el.innerHTML = `
+      <div class="frow">
+        <div class="fg">
+          <label class="fl">種別</label>
+          <select class="fsel" id="m-type">
+            ${[['article','Journal Article'],['inproceedings','Conference Paper'],['preprint','Preprint'],['book','Book'],['misc','Other'],['phdthesis','PhD Thesis']].map(([v,l])=>`<option value="${v}"${p.type===v?' selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="fg" style="max-width:90px;">
+          <label class="fl">年</label>
+          <input class="fi" type="number" id="m-year" value="${p.year||''}" placeholder="2024">
+        </div>
+      </div>
+      <div class="fg"><label class="fl">タイトル *</label><input class="fi" id="m-title" value="${h(plainText(p.title||''))}" placeholder="論文タイトル"></div>
+      <div class="fg"><label class="fl">著者（セミコロン区切り: Last, First; Last2, First2）</label><input class="fi" id="m-authors" value="${h(auStr)}" placeholder="Yamada, Taro; Suzuki, Hanako"></div>
+      <div class="frow">
+        <div class="fg"><label class="fl">ジャーナル / 会議名</label><input class="fi" id="m-journal" value="${h(p.journal||'')}" placeholder="Journal of ..."></div>
+        <div class="fg" style="max-width:65px;"><label class="fl">巻</label><input class="fi" id="m-vol" value="${h(p.volume||'')}" placeholder="10"></div>
+        <div class="fg" style="max-width:55px;"><label class="fl">号</label><input class="fi" id="m-num" value="${h(p.number||'')}" placeholder="2"></div>
+        <div class="fg" style="max-width:85px;"><label class="fl">ページ</label><input class="fi" id="m-pages" value="${h(p.pages||'')}" placeholder="1-10"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label class="fl">DOI</label><input class="fi" id="m-doi" value="${h(p.doi||'')}" placeholder="10.xxx/xxx"></div>
+        <div class="fg"><label class="fl">arXiv ID</label><input class="fi" id="m-arxiv" value="${h(p.arxivId||'')}" placeholder="2301.12345"></div>
+      </div>
+      <div class="fg"><label class="fl">URL</label><input class="fi" id="m-url" value="${h(p.url||'')}" placeholder="https://..."></div>
+      <div class="fg"><label class="fl">Abstract</label><textarea class="fta" id="m-abs" placeholder="Abstract...">${h(p.abstract||'')}</textarea></div>
+    `;
+  } else if (M.tab==='pdf') {
+    el.innerHTML = `
+      <div class="drop-area" id="pdf-drop" data-action="trigger-pdf-input">
+        <span class="di">📄</span>PDFをドラッグ＆ドロップ<br>またはクリックして選択
+        <input type="file" id="pdf-in" accept=".pdf,application/pdf" style="display:none">
+      </div>
+      <div class="fs" id="pdf-st"></div>
+      <div class="preview" id="pdf-pv"></div>`;
+  }
+}
+async function doFetch() {
+  const val = document.getElementById('doi-in').value.trim();
+  if (!val) return;
+  const btn=document.getElementById('fetch-btn'), st=document.getElementById('fetch-st'), pv=document.getElementById('fetch-pv');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> 取得中…';
+  st.textContent=''; st.className='fs'; pv.classList.remove('on');
+  try {
+    const isArxiv = /^\d{4}\.\d+/.test(val) || /^[a-z\-]+\/\d/.test(val) || val.includes('arxiv');
+    const paper = normalizePaper(isArxiv ? await fetchArxiv(val) : await fetchDOI(val));
+    M.pending = paper;
+    st.textContent='✓ 取得成功！'; st.className='fs ok';
+    pv.classList.add('on');
+    pv.innerHTML=`<strong>${richInline(paper.title)}</strong>${(paper.authors||[]).slice(0,3).map(a=>a.split(',')[0]).join(', ')} · ${paper.year||'—'} · ${h(paper.journal||'')}${paper.citationCount!=null?`<br><small>被引用数: ${paper.citationCount}</small>`:''}`;
+  } catch(e) { st.textContent=`✕ ${e.message}`; st.className='fs err'; }
+  finally { btn.disabled=false; btn.innerHTML='🔍 取得'; }
+}
+
+function doParseBib() {
+  const txt=document.getElementById('bib-in').value;
+  const st=document.getElementById('bib-st'), pv=document.getElementById('bib-pv');
+  const parsed=parseBib(txt);
+  const paper=parsed ? normalizePaper(parsed) : null;
+  if (!paper) { st.textContent='✕ BibTeXの解析に失敗しました'; st.className='fs err'; return; }
+  M.pending=paper; st.textContent='✓ 解析成功！'; st.className='fs ok';
+  pv.classList.add('on');
+  pv.innerHTML=`<strong>${richInline(paper.title||'（タイトルなし）')}</strong>${(paper.authors||[]).slice(0,3).join(', ')} · ${paper.year||'—'}`;
+}
+
+async function handlePDF(file) {
+  if (!file || file.type !== 'application/pdf') return;
+  const st=document.getElementById('pdf-st'), pv=document.getElementById('pdf-pv');
+  st.textContent='⏳ メタデータ抽出中…'; st.className='fs';
+  try {
+    const paper=normalizePaper(await extractPDF(file));
+    paper.pdfName = file.name || 'document.pdf';
+    paper.hasPdf = true;
+    paper._pdfFile = file;
+    M.pending=paper; st.textContent='✓ 抽出完了（PDF も保存されます）'; st.className='fs ok';
+    pv.classList.add('on');
+    pv.innerHTML=`<strong>${richInline(paper.title||'（タイトル未取得）')}</strong>${(paper.authors||[]).join(', ')||'著者未取得'}<br><small>${h(paper.pdfName)}</small>`;
+  } catch(e) { st.textContent=`✕ ${e.message}`; st.className='fs err'; }
+}
+
+function readManualForm(existingId) {
+  const orig = existingId ? S.papers.find(p=>p.id===existingId) : {};
+  return normalizePaper({
+    id: existingId || uid(),
+    type: document.getElementById('m-type').value,
+    title: document.getElementById('m-title').value.trim(),
+    authors: document.getElementById('m-authors').value.split(';').map(a=>a.trim()).filter(Boolean),
+    year: parseInt(document.getElementById('m-year').value)||null,
+    journal: document.getElementById('m-journal').value.trim(),
+    volume: document.getElementById('m-vol').value.trim(),
+    number: document.getElementById('m-num').value.trim(),
+    pages: document.getElementById('m-pages').value.trim(),
+    publisher: orig.publisher||'',
+    doi: document.getElementById('m-doi').value.trim(),
+    arxivId: document.getElementById('m-arxiv').value.trim(),
+    url: document.getElementById('m-url').value.trim(),
+    abstract: document.getElementById('m-abs').value.trim(),
+    citationCount: orig.citationCount??null,
+    tags: orig.tags||[], collections: orig.collections||[],
+    starred: orig.starred||false, readStatus: orig.readStatus||'unread',
+    notes: orig.notes||'', addedAt: orig.addedAt||new Date().toISOString(),
+    bibtexKey: orig.bibtexKey||'',
+    pdfId: orig.pdfId||'', pdfName: orig.pdfName||'', hasPdf: orig.hasPdf||false,
+    pdfOriginalName: orig.pdfOriginalName||'',
+    pdfPath: orig.pdfPath||'',
+    supplementalFiles: orig.supplementalFiles||[]
+  });
+}
+async function saveModal() {
+  let paper = null;
+  if (M.tab==='manual' || M.editId) {
+    paper = readManualForm(M.editId||null);
+    if (!paper.title) { alert('タイトルを入力してください'); return; }
+  } else {
+    if (!M.pending) {
+      alert(M.tab==='doi'?'まず「取得」ボタンを押してください':M.tab==='bibtex'?'まず「解析する」ボタンを押してください':'まずPDFを選択してください');
+      return;
+    }
+    paper = M.pending;
+  }
+  if (!paper.bibtexKey) paper.bibtexKey = bKey(paper);
+  if (paper._pdfFile) {
+    paper.pdfId = paper.pdfId || paper.id;
+    try {
+      await putPdfBlob(paper.pdfId || paper.id, paper._pdfFile);
+      paper.hasPdf = true;
+    } catch (e) {
+      console.error(e);
+      alert('PDF の保存に失敗しました: ' + e.message);
+      return;
+    }
+    delete paper._pdfFile;
+  }
+  if (M.editId) {
+    const i=S.papers.findIndex(p=>p.id===M.editId);
+    if (i!==-1) {
+      const prev = S.papers[i];
+      paper.hasPdf = paper.hasPdf || prev.hasPdf || false;
+      paper.pdfId = paper.pdfId || prev.pdfId || '';
+      paper.pdfName = paper.pdfName || prev.pdfName || '';
+      paper.supplementalFiles = paper.supplementalFiles || prev.supplementalFiles || [];
+      S.papers[i]=paper;
+    }
+    toast('文献を更新しました');
+  } else {
+    S.papers.unshift(paper);
+    S.selectedId=paper.id;
+    toast('文献を追加しました');
+  }
+  save(); closeModal('add-modal'); render();
+}
+
+/* ============================================================
+   BIBTEX EXPORT
+============================================================ */
+function showBib(id) {
+  const p=S.papers.find(q=>q.id===id);
+  if (!p) return;
+  document.getElementById('bib-out').textContent=genBib(p);
+  document.getElementById('bib-modal').classList.add('open');
+}
+function cpBib() {
+  navigator.clipboard.writeText(document.getElementById('bib-out').textContent)
+    .then(()=>toast('コピーしました'));
+}
+function dlBib() {
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([document.getElementById('bib-out').textContent],{type:'text/plain'}));
+  a.download='reference.bib'; a.click();
+}
+
+/* ============================================================
+   EVENTS
+============================================================ */
+document.addEventListener('click', async (event) => {
+  const actionEl = event.target.closest('[data-action]');
+  if (!actionEl) return;
+  const action = actionEl.dataset.action;
+  const id = actionEl.dataset.id || '';
+  const fileId = actionEl.dataset.fileId || '';
+  const view = actionEl.dataset.view || '';
+  const modal = actionEl.dataset.modal || '';
+  const tab = actionEl.dataset.tab || '';
+  const status = actionEl.dataset.status || '';
+  try {
+    switch (action) {
+      case 'open-add-modal': openAddModal(); break;
+      case 'close-modal': closeModal(modal); break;
+      case 'switch-tab': switchTab(tab); break;
+      case 'save-modal': await saveModal(); break;
+      case 'copy-bib': cpBib(); break;
+      case 'download-bib': dlBib(); break;
+      case 'choose-storage-folder': await chooseStorageFolder(); break;
+      case 'toggle-realtime-sync': await toggleRealtimeSync(); break;
+      case 'import-from-folder': await importDataFromChosenFolderPrompt(); break;
+      case 'sync-to-folder': await syncAllDataToChosenFolder(true); break;
+      case 'clear-storage-folder': await clearStorageFolder(); break;
+      case 'add-collection': addCollection(); break;
+      case 'move-collection-up':
+        event.stopPropagation();
+        moveCollection(id, 'up');
+        break;
+      case 'move-collection-down':
+        event.stopPropagation();
+        moveCollection(id, 'down');
+        break;
+      case 'rename-collection':
+        event.stopPropagation();
+        renameCollection(id);
+        break;
+      case 'delete-collection':
+        event.stopPropagation();
+        deleteCollection(id);
+        break;
+      case 'set-view': setView(view); break;
+      case 'select-paper': selectPaper(id); break;
+      case 'toggle-star':
+        event.stopPropagation();
+        toggleStar(id);
+        break;
+      case 'toggle-abstract': toggleAbs(); break;
+      case 'remove-tag': rmTagBtn(actionEl); break;
+      case 'set-status': setStatus(id, status); break;
+      case 'prompt-attach-pdf': promptAttachPdf(id); break;
+      case 'open-pdf':
+        event.preventDefault();
+        await openStoredPdf(id);
+        break;
+      case 'remove-pdf': await removeAttachedPdf(id); break;
+      case 'prompt-attach-supplement': promptAttachSupplement(id); break;
+      case 'open-supplement':
+        event.preventDefault();
+        await openStoredSupplement(id, fileId);
+        break;
+      case 'remove-supplement':
+        event.preventDefault();
+        await removeSupplement(id, fileId);
+        break;
+      case 'open-edit-modal': openEditModal(id); break;
+      case 'show-bib': showBib(id); break;
+      case 'delete-paper': await delPaper(id); break;
+      case 'do-fetch': await doFetch(); break;
+      case 'parse-bib': doParseBib(); break;
+      case 'trigger-pdf-input': {
+        const input = document.getElementById('pdf-in');
+        if (input) input.click();
+        break;
+      }
+    }
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+document.addEventListener('input', (event) => {
+  if (event.target.id === 'srch') onSearch(event.target.value);
+});
+
+document.addEventListener('change', async (event) => {
+  const target = event.target;
+  if (target.id === 'fa') onFilter('author', target.value);
+  else if (target.id === 'fy') onFilter('year', target.value);
+  else if (target.id === 'fj') onFilter('journal', target.value);
+  else if (target.id === 'sort') onSort(target.value);
+  else if (target.id === 'pdf-attach-global') await handleExistingPaperPdf(target);
+  else if (target.id === 'supp-attach-global') await handleExistingPaperSupplement(target);
+  else if (target.id === 'pdf-in') await handlePDF(target.files && target.files[0]);
+  else if (target.dataset.action === 'set-collection') setCol(target.dataset.id, target.value);
+  else if (target.dataset.action === 'notes-change') updNotes(target.dataset.id, target.value);
+});
+
+document.addEventListener('keydown', async (event) => {
+  if (event.key==='Escape') document.querySelectorAll('.modal-ov.open').forEach(m=>closeModal(m.id));
+  if (event.target.id === 'doi-in' && event.key === 'Enter') {
+    event.preventDefault();
+    await doFetch();
+  }
+  if (event.target.dataset.action === 'tag-input' && (event.key === 'Enter' || event.key === ',')) {
+    addTag(event.target.dataset.id, event.target.value);
+    event.target.value='';
+    event.preventDefault();
+  }
+});
+
+document.addEventListener('focusout', (event) => {
+  if (event.target.dataset.action === 'tag-input' && event.target.value.trim()) {
+    addTag(event.target.dataset.id, event.target.value);
+    event.target.value='';
+  }
+});
+
+document.addEventListener('dragover', (event) => {
+  const drop = event.target.closest('#pdf-drop');
+  if (!drop) return;
+  event.preventDefault();
+  drop.classList.add('dov');
+});
+
+document.addEventListener('dragleave', (event) => {
+  const drop = event.target.closest('#pdf-drop');
+  if (!drop) return;
+  if (!drop.contains(event.relatedTarget)) drop.classList.remove('dov');
+});
+
+document.addEventListener('drop', async (event) => {
+  const drop = event.target.closest('#pdf-drop');
+  if (!drop) return;
+  event.preventDefault();
+  drop.classList.remove('dov');
+  const file = event.dataTransfer?.files?.[0];
+  if (file) await handlePDF(file);
+});
+
+document.querySelectorAll('.modal-ov').forEach(el => {
+  el.addEventListener('click', e => { if(e.target===el) closeModal(el.id); });
+});
+/* ============================================================
+   INIT
+============================================================ */
+load();
+recomputeLocalDiff();
+render();
+restoreStorageFolder().then(() => renderSidebar()).catch(err => console.error(err));
+</script>
+</body>
+</html>
