@@ -734,9 +734,15 @@ function sanitizeExternalUrl(raw) {
 }
 
 function sanitizeRelativePath(raw) {
-  const value = sanitizeText(raw, 240).replace(/\\/g, '/');
-  if (!value || value.startsWith('/') || value.includes('..')) return '';
-  return /^[A-Za-z0-9._\/-]+$/.test(value) ? value : '';
+  const value = sanitizeText(raw, 240).replace(/\\/g, '/').trim();
+  if (!value || value.startsWith('/')) return '';
+  const parts = value.split('/').filter(Boolean);
+  if (!parts.length) return '';
+  for (const part of parts) {
+    if (part === '.' || part === '..') return '';
+    if (/[\u0000-\u001f\u007f]/.test(part)) return '';
+  }
+  return parts.join('/');
 }
 
 function normalizeCollection(value) {
