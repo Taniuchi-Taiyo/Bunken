@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "TANIUCHI"
+    given-names: "Taiyo"
+    affiliation: "Kyoto University"
+title: "Bunken: A reference manager for researchers"
+version: v2026-1
+date-released: 2026-03-28
+url: "https://github.com/Taniuchi-Taiyo/bunken"
