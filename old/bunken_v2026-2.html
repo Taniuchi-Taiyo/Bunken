@@ -563,7 +563,6 @@
     <div class="list-hd">
       <div class="list-hd-top">
         <span class="list-title" id="list-title">すべての文献</span>
-        <button class="btn-sec" id="collection-bib-btn" type="button" data-action="show-collection-bib" style="display:none;">{ } BibTeX 一括</button>
         <button class="btn-add" type="button" data-action="open-add-modal">＋ 追加</button>
       </div>
       <div class="search-wrap">
@@ -1891,21 +1890,8 @@ function renderList() {
   const pp = filtered();
   const labels = { all:'すべての文献', starred:'スター付き', unread:'未読', reading:'読書中', read:'読了' };
   let title = labels[S.view] || '';
-  const collectionBibBtn = document.getElementById('collection-bib-btn');
-  if (S.view.startsWith('col:')) {
-    const c=S.collections.find(c=>c.id===S.view.slice(4));
-    title=c?`📁 ${c.name}`:'コレクション';
-    if (collectionBibBtn) {
-      collectionBibBtn.style.display = c ? 'flex' : 'none';
-      collectionBibBtn.dataset.collectionId = c ? c.id : '';
-    }
-  } else {
-    if (collectionBibBtn) {
-      collectionBibBtn.style.display = 'none';
-      collectionBibBtn.dataset.collectionId = '';
-    }
-    if (S.view.startsWith('tag:')) title = `# ${S.view.slice(4)}`;
-  }
+  if (S.view.startsWith('col:')) { const c=S.collections.find(c=>c.id===S.view.slice(4)); title=c?`📁 ${c.name}`:'コレクション'; }
+  else if (S.view.startsWith('tag:')) title = `# ${S.view.slice(4)}`;
   document.getElementById('list-title').textContent = title;
 
   if (!pp.length) {
@@ -2516,36 +2502,20 @@ async function saveModal() {
 /* ============================================================
    BIBTEX EXPORT
 ============================================================ */
-function setBibOutput(content, filename='reference.bib') {
-  const out = document.getElementById('bib-out');
-  out.textContent = content;
-  out.dataset.filename = filename;
-  document.getElementById('bib-modal').classList.add('open');
-}
 function showBib(id) {
   const p=S.papers.find(q=>q.id===id);
   if (!p) return;
-  setBibOutput(genBib(p), `${sanitizeFilePart(p.bibtexKey || bKey(p) || 'reference')}.bib`);
-}
-function showCollectionBib(collectionId) {
-  const collection = S.collections.find(c => c.id === collectionId);
-  if (!collection) return;
-  const papers = S.papers.filter(p => (p.collections || []).includes(collectionId));
-  if (!papers.length) {
-    toast('このコレクションに文献がありません');
-    return;
-  }
-  setBibOutput(papers.map(genBib).join('\n\n'), `${sanitizeFilePart(collection.name || 'collection')}.bib`);
+  document.getElementById('bib-out').textContent=genBib(p);
+  document.getElementById('bib-modal').classList.add('open');
 }
 function cpBib() {
   navigator.clipboard.writeText(document.getElementById('bib-out').textContent)
     .then(()=>toast('コピーしました'));
 }
 function dlBib() {
-  const out = document.getElementById('bib-out');
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([out.textContent],{type:'text/plain'}));
-  a.download=out.dataset.filename || 'reference.bib'; a.click();
+  a.href=URL.createObjectURL(new Blob([document.getElementById('bib-out').textContent],{type:'text/plain'}));
+  a.download='reference.bib'; a.click();
 }
 
 /* ============================================================
@@ -2558,7 +2528,6 @@ document.addEventListener('click', async (event) => {
   const id = actionEl.dataset.id || '';
   const fileId = actionEl.dataset.fileId || '';
   const view = actionEl.dataset.view || '';
-  const collectionId = actionEl.dataset.collectionId || '';
   const modal = actionEl.dataset.modal || '';
   const tab = actionEl.dataset.tab || '';
   const status = actionEl.dataset.status || '';
@@ -2618,7 +2587,6 @@ document.addEventListener('click', async (event) => {
         break;
       case 'open-edit-modal': openEditModal(id); break;
       case 'show-bib': showBib(id); break;
-      case 'show-collection-bib': showCollectionBib(collectionId || (S.view.startsWith('col:') ? S.view.slice(4) : '')); break;
       case 'delete-paper': await delPaper(id); break;
       case 'do-fetch': await doFetch(); break;
       case 'parse-bib': doParseBib(); break;
