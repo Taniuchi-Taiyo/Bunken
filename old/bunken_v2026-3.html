@@ -33,8 +33,6 @@
       --ff:         system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       --ft:         'Georgia', 'Times New Roman', serif;
       --fm:         ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      --sidebar-w: 196px;
-      --list-pane-w: 340px;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -82,35 +80,15 @@
     #app { display: flex; height: 100vh; overflow: hidden; }
 
     .sidebar {
-      width: var(--sidebar-w); min-width: 140px; max-width: 420px;
+      width: 196px; min-width: 196px;
       background: var(--bg-side);
       border-right: 1px solid var(--border);
       display: flex; flex-direction: column;
       overflow-y: auto; overflow-x: hidden;
       flex-shrink: 0;
     }
-    .sidebar-resizer, .list-pane-resizer {
-      width: 7px; flex: 0 0 7px;
-      cursor: col-resize;
-      position: relative;
-      background: transparent;
-      z-index: 5;
-      user-select: none;
-      touch-action: none;
-    }
-    .sidebar-resizer::after, .list-pane-resizer::after {
-      content: '';
-      position: absolute; inset: 0 3px;
-      background: transparent;
-      transition: background .12s;
-    }
-    .sidebar-resizer:hover::after,
-    body.sidebar-resizing .sidebar-resizer::after,
-    .list-pane-resizer:hover::after,
-    body.list-pane-resizing .list-pane-resizer::after { background: var(--accent); }
-    body.sidebar-resizing, body.list-pane-resizing { cursor: col-resize; user-select: none; }
     .list-pane {
-      width: var(--list-pane-w); min-width: 240px; max-width: 720px;
+      width: 340px; min-width: 240px;
       border-right: 1px solid var(--border);
       display: flex; flex-direction: column;
       overflow: hidden; flex-shrink: 0;
@@ -557,32 +535,6 @@
       white-space: pre; overflow-x: auto; line-height: 1.65;
       max-height: 450px; overflow-y: auto;
     }
-    .dup-summary { font-size: 12px; color: var(--text-2); margin-bottom: 12px; line-height: 1.6; }
-    .dup-list { display: flex; flex-direction: column; gap: 12px; }
-    .dup-group {
-      border: 1px solid var(--border);
-      border-radius: var(--r);
-      background: var(--bg-card);
-      overflow: hidden;
-    }
-    .dup-key {
-      padding: 8px 10px;
-      background: var(--bg-hover);
-      border-bottom: 1px solid var(--border);
-      font-size: 11px; font-weight: 600;
-      color: var(--text-2);
-    }
-    .dup-paper {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 10px;
-      border-bottom: 1px solid var(--border-lt);
-    }
-    .dup-paper:last-child { border-bottom: none; }
-    .dup-paper-main { flex: 1; min-width: 0; }
-    .dup-title { font-size: 13px; font-weight: 500; color: var(--text); line-height: 1.4; }
-    .dup-meta { font-size: 11px; color: var(--text-m); margin-top: 3px; line-height: 1.5; }
-    .dup-actions { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
-    .dup-empty { text-align: center; padding: 28px 10px; color: var(--text-m); font-size: 13px; }
 
     /* Toast */
     .toast {
@@ -607,12 +559,10 @@
 <body>
 <div id="app">
   <div class="sidebar" id="sidebar"></div>
-  <div class="sidebar-resizer" id="sidebar-resizer" title="サイドバー幅を調整（ダブルクリックで初期幅）"></div>
   <div class="list-pane">
     <div class="list-hd">
       <div class="list-hd-top">
         <span class="list-title" id="list-title">すべての文献</span>
-        <button class="btn-sec" id="collection-dup-btn" type="button" data-action="show-collection-duplicates" style="display:none;">重複チェック</button>
         <button class="btn-sec" id="collection-bib-btn" type="button" data-action="show-collection-bib" style="display:none;">{ } BibTeX 一括</button>
         <button class="btn-add" type="button" data-action="open-add-modal">＋ 追加</button>
       </div>
@@ -634,7 +584,6 @@
     </div>
     <div class="paper-list" id="paper-list"></div>
   </div>
-  <div class="list-pane-resizer" id="list-pane-resizer" title="文献リスト幅を調整（ダブルクリックで初期幅）"></div>
   <div class="detail-pane" id="detail-pane"></div>
 </div>
 
@@ -675,20 +624,6 @@
   </div>
 </div>
 
-<!-- DUPLICATE MODAL -->
-<div class="modal-ov" id="dup-modal">
-  <div class="modal-box">
-    <div class="modal-hd">
-      <span class="modal-hd-title" id="dup-modal-title">重複チェック</span>
-      <button class="modal-x" type="button" data-action="close-modal" data-modal="dup-modal">✕</button>
-    </div>
-    <div class="modal-body" id="dup-modal-body"></div>
-    <div class="modal-ft">
-      <button class="btn-sec" type="button" data-action="close-modal" data-modal="dup-modal">閉じる</button>
-    </div>
-  </div>
-</div>
-
 <input type="file" id="pdf-attach-global" accept=".pdf,application/pdf" style="display:none">
 <input type="file" id="supp-attach-global" multiple style="display:none">
 <div class="toast" id="toast"></div>
@@ -696,14 +631,6 @@
 <script>
 const PDFJS_MODULE_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.mjs';
 const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.worker.min.mjs';
-const SIDEBAR_WIDTH_KEY = 'bunken_sidebar_width';
-const SIDEBAR_MIN_WIDTH = 140;
-const SIDEBAR_MAX_WIDTH = 420;
-const SIDEBAR_DEFAULT_WIDTH = 196;
-const LIST_PANE_WIDTH_KEY = 'bunken_list_pane_width';
-const LIST_PANE_MIN_WIDTH = 240;
-const LIST_PANE_MAX_WIDTH = 720;
-const LIST_PANE_DEFAULT_WIDTH = 340;
 let pdfjsModulePromise = null;
 
 async function getPdfJsLib() {
@@ -757,11 +684,6 @@ let M = {
   tab: 'doi',
   editId: null,
   pending: null   // paper from fetch/parse awaiting save
-};
-
-let D = {
-  collectionId: '',
-  groups: []
 };
 
 /* ============================================================
@@ -1684,102 +1606,6 @@ function safeArxivUrl(arxivId) {
   return `https://arxiv.org/abs/${encodeURIComponent(cleaned).replace(/%2F/g, '/')}`;
 }
 
-function clampSidebarWidth(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return SIDEBAR_DEFAULT_WIDTH;
-  return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, Math.round(n)));
-}
-
-function applySidebarWidth(value, persist = false) {
-  const w = clampSidebarWidth(value);
-  document.documentElement.style.setProperty('--sidebar-w', `${w}px`);
-  if (persist) {
-    try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(w)); } catch (_) {}
-  }
-}
-
-function restoreSidebarWidth() {
-  try {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    if (saved) applySidebarWidth(saved, false);
-  } catch (_) {}
-}
-
-function initSidebarResize() {
-  const resizer = document.getElementById('sidebar-resizer');
-  const sidebar = document.getElementById('sidebar');
-  if (!resizer || !sidebar) return;
-  let startX = 0;
-  let startW = SIDEBAR_DEFAULT_WIDTH;
-  const stop = () => {
-    document.body.classList.remove('sidebar-resizing');
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', stop);
-    window.removeEventListener('pointercancel', stop);
-  };
-  const move = (e) => {
-    applySidebarWidth(startW + e.clientX - startX, true);
-  };
-  resizer.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    startX = e.clientX;
-    startW = sidebar.getBoundingClientRect().width;
-    document.body.classList.add('sidebar-resizing');
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', stop);
-    window.addEventListener('pointercancel', stop);
-  });
-  resizer.addEventListener('dblclick', () => applySidebarWidth(SIDEBAR_DEFAULT_WIDTH, true));
-}
-
-function clampListPaneWidth(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return LIST_PANE_DEFAULT_WIDTH;
-  return Math.max(LIST_PANE_MIN_WIDTH, Math.min(LIST_PANE_MAX_WIDTH, Math.round(n)));
-}
-
-function applyListPaneWidth(value, persist = false) {
-  const w = clampListPaneWidth(value);
-  document.documentElement.style.setProperty('--list-pane-w', `${w}px`);
-  if (persist) {
-    try { localStorage.setItem(LIST_PANE_WIDTH_KEY, String(w)); } catch (_) {}
-  }
-}
-
-function restoreListPaneWidth() {
-  try {
-    const saved = localStorage.getItem(LIST_PANE_WIDTH_KEY);
-    if (saved) applyListPaneWidth(saved, false);
-  } catch (_) {}
-}
-
-function initListPaneResize() {
-  const resizer = document.getElementById('list-pane-resizer');
-  const pane = document.querySelector('.list-pane');
-  if (!resizer || !pane) return;
-  let startX = 0;
-  let startW = LIST_PANE_DEFAULT_WIDTH;
-  const stop = () => {
-    document.body.classList.remove('list-pane-resizing');
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', stop);
-    window.removeEventListener('pointercancel', stop);
-  };
-  const move = (e) => {
-    applyListPaneWidth(startW + e.clientX - startX, true);
-  };
-  resizer.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    startX = e.clientX;
-    startW = pane.getBoundingClientRect().width;
-    document.body.classList.add('list-pane-resizing');
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', stop);
-    window.addEventListener('pointercancel', stop);
-  });
-  resizer.addEventListener('dblclick', () => applyListPaneWidth(LIST_PANE_DEFAULT_WIDTH, true));
-}
-
 /* ============================================================
    BIBTEX KEY
 ============================================================ */
@@ -2066,7 +1892,6 @@ function renderList() {
   const labels = { all:'すべての文献', starred:'スター付き', unread:'未読', reading:'読書中', read:'読了' };
   let title = labels[S.view] || '';
   const collectionBibBtn = document.getElementById('collection-bib-btn');
-  const collectionDupBtn = document.getElementById('collection-dup-btn');
   if (S.view.startsWith('col:')) {
     const c=S.collections.find(c=>c.id===S.view.slice(4));
     title=c?`📁 ${c.name}`:'コレクション';
@@ -2074,18 +1899,10 @@ function renderList() {
       collectionBibBtn.style.display = c ? 'flex' : 'none';
       collectionBibBtn.dataset.collectionId = c ? c.id : '';
     }
-    if (collectionDupBtn) {
-      collectionDupBtn.style.display = c ? 'flex' : 'none';
-      collectionDupBtn.dataset.collectionId = c ? c.id : '';
-    }
   } else {
     if (collectionBibBtn) {
       collectionBibBtn.style.display = 'none';
       collectionBibBtn.dataset.collectionId = '';
-    }
-    if (collectionDupBtn) {
-      collectionDupBtn.style.display = 'none';
-      collectionDupBtn.dataset.collectionId = '';
     }
     if (S.view.startsWith('tag:')) title = `# ${S.view.slice(4)}`;
   }
@@ -2697,151 +2514,6 @@ async function saveModal() {
 }
 
 /* ============================================================
-   DUPLICATE CHECK
-============================================================ */
-function normalizeDuplicateDoi(value) {
-  return sanitizeText(value, 256)
-    .replace(/^https?:\/\/(dx\.)?doi\.org\//i, '')
-    .replace(/^doi:/i, '')
-    .replace(/\s+/g, '')
-    .toLowerCase();
-}
-
-function normalizeDuplicateArxiv(value) {
-  return sanitizeText(value, 128)
-    .replace(/^https?:\/\/arxiv\.org\/(abs|pdf)\//i, '')
-    .replace(/\.pdf$/i, '')
-    .replace(/v\d+$/i, '')
-    .replace(/\s+/g, '')
-    .toLowerCase();
-}
-
-function normalizeDuplicateTitle(value) {
-  return plainText(value || '')
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[\\/：:;,.，．。()[\]{}「」『』\"'`!?！？\-_–—]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function duplicateKeysForPaper(paper) {
-  const keys = [];
-  const doi = normalizeDuplicateDoi(paper.doi || '');
-  if (doi) keys.push({ key: 'doi:' + doi, label: 'DOI: ' + doi });
-  const arxiv = normalizeDuplicateArxiv(paper.arxivId || '');
-  if (arxiv) keys.push({ key: 'arxiv:' + arxiv, label: 'arXiv: ' + arxiv });
-  const title = normalizeDuplicateTitle(paper.title || '');
-  if (title.length >= 12) keys.push({ key: 'title:' + title, label: 'Title: ' + title });
-  return keys;
-}
-
-function findCollectionDuplicates(collectionId) {
-  const groups = new Map();
-  S.papers
-    .filter(p => (p.collections || []).includes(collectionId))
-    .forEach(p => {
-      duplicateKeysForPaper(p).forEach(key => {
-        if (!groups.has(key.key)) groups.set(key.key, { key: key.key, label: key.label, papers: [] });
-        groups.get(key.key).papers.push(p);
-      });
-    });
-  const seen = new Set();
-  return [...groups.values()]
-    .filter(g => g.papers.length >= 2)
-    .filter(g => {
-      const sig = g.papers.map(p => p.id).sort().join('|');
-      if (seen.has(sig)) return false;
-      seen.add(sig);
-      return true;
-    })
-    .sort((a, b) => b.papers.length - a.papers.length || a.label.localeCompare(b.label));
-}
-
-function openDuplicateModal(collectionId) {
-  const collection = S.collections.find(c => c.id === collectionId);
-  if (!collection) return;
-  D.collectionId = collectionId;
-  D.groups = findCollectionDuplicates(collectionId);
-  const title = document.getElementById('dup-modal-title');
-  if (title) title.textContent = `重複チェック — ${collection.name}`;
-  renderDuplicateModalBody();
-  document.getElementById('dup-modal').classList.add('open');
-}
-
-function renderDuplicateModalBody() {
-  const body = document.getElementById('dup-modal-body');
-  if (!body) return;
-  const collection = S.collections.find(c => c.id === D.collectionId);
-  if (!collection) {
-    body.innerHTML = '<div class="dup-empty">コレクションが見つかりません</div>';
-    return;
-  }
-  const totalDupPapers = D.groups.reduce((sum, group) => sum + group.papers.length, 0);
-  if (!D.groups.length) {
-    body.innerHTML = `<div class="dup-empty">「${h(collection.name)}」内に重複候補はありません</div>`;
-    return;
-  }
-  body.innerHTML = `
-    <div class="dup-summary">
-      「${h(collection.name)}」内で ${D.groups.length} 組 / ${totalDupPapers} 件の重複候補が見つかりました。<br>
-      「これを残す」を押すと、同じ組の他の文献をこのコレクションから外します（ライブラリ本体からは削除しません）。
-    </div>
-    <div class="dup-list">
-      ${D.groups.map((group, gi) => `
-        <div class="dup-group">
-          <div class="dup-key">${h(group.label)}</div>
-          ${group.papers.map(p => {
-            const authors = (p.authors || []).slice(0, 3).map(a => a.split(',')[0].trim()).join(', ') || '著者不明';
-            const meta = [authors, p.year || '', p.journal || '', p.doi ? `DOI: ${p.doi}` : '', p.arxivId ? `arXiv: ${p.arxivId}` : ''].filter(Boolean).join(' · ');
-            return `<div class="dup-paper">
-              <div class="dup-paper-main">
-                <div class="dup-title">${richInline(p.title || '（タイトルなし）')}</div>
-                <div class="dup-meta">${h(meta)}</div>
-              </div>
-              <div class="dup-actions">
-                <button type="button" class="btn-sec" data-action="resolve-duplicate-group" data-group="${gi}" data-id="${h(p.id)}">これを残す</button>
-                <button type="button" class="btn-del" data-action="remove-duplicate-from-collection" data-id="${h(p.id)}">外す</button>
-              </div>
-            </div>`;
-          }).join('')}
-        </div>`).join('')}
-    </div>`;
-}
-
-function removePaperFromCollection(paperId, collectionId) {
-  const paper = S.papers.find(p => p.id === paperId);
-  if (!paper) return false;
-  const before = (paper.collections || []).length;
-  paper.collections = (paper.collections || []).filter(id => id !== collectionId);
-  return paper.collections.length !== before;
-}
-
-function refreshDuplicateModalAfterChange(message) {
-  D.groups = findCollectionDuplicates(D.collectionId);
-  save(); render();
-  if (document.getElementById('dup-modal')?.classList.contains('open')) renderDuplicateModalBody();
-  if (message) toast(message);
-}
-
-function resolveDuplicateGroup(groupIndex, keepId) {
-  const group = D.groups[Number(groupIndex)];
-  if (!group || !keepId) return;
-  let removed = 0;
-  group.papers.forEach(p => {
-    if (p.id !== keepId && removePaperFromCollection(p.id, D.collectionId)) removed++;
-  });
-  refreshDuplicateModalAfterChange(`${removed} 件をコレクションから外しました`);
-}
-
-function removeDuplicateFromCollection(paperId) {
-  if (!paperId || !D.collectionId) return;
-  if (removePaperFromCollection(paperId, D.collectionId)) {
-    refreshDuplicateModalAfterChange('1 件をコレクションから外しました');
-  }
-}
-
-/* ============================================================
    BIBTEX EXPORT
 ============================================================ */
 function setBibOutput(content, filename='reference.bib') {
@@ -2887,7 +2559,6 @@ document.addEventListener('click', async (event) => {
   const fileId = actionEl.dataset.fileId || '';
   const view = actionEl.dataset.view || '';
   const collectionId = actionEl.dataset.collectionId || '';
-  const groupIndex = actionEl.dataset.group || '';
   const modal = actionEl.dataset.modal || '';
   const tab = actionEl.dataset.tab || '';
   const status = actionEl.dataset.status || '';
@@ -2948,9 +2619,6 @@ document.addEventListener('click', async (event) => {
       case 'open-edit-modal': openEditModal(id); break;
       case 'show-bib': showBib(id); break;
       case 'show-collection-bib': showCollectionBib(collectionId || (S.view.startsWith('col:') ? S.view.slice(4) : '')); break;
-      case 'show-collection-duplicates': openDuplicateModal(collectionId || (S.view.startsWith('col:') ? S.view.slice(4) : '')); break;
-      case 'resolve-duplicate-group': resolveDuplicateGroup(groupIndex, id); break;
-      case 'remove-duplicate-from-collection': removeDuplicateFromCollection(id); break;
       case 'delete-paper': await delPaper(id); break;
       case 'do-fetch': await doFetch(); break;
       case 'parse-bib': doParseBib(); break;
@@ -3031,12 +2699,8 @@ document.querySelectorAll('.modal-ov').forEach(el => {
    INIT
 ============================================================ */
 load();
-restoreSidebarWidth();
-restoreListPaneWidth();
 recomputeLocalDiff();
 render();
-initSidebarResize();
-initListPaneResize();
 restoreStorageFolder().then(() => renderSidebar()).catch(err => console.error(err));
 </script>
 </body>
