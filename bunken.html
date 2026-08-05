@@ -1908,34 +1908,117 @@ async function fetchArxiv(raw) {
 /* ============================================================
    PDF METADATA
 ============================================================ */
+const DOI_RE = /\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+/ig;
+
+function normalizeDoi(value) {
+  return String(value || '').trim()
+    .replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '')
+    .replace(/^doi:\s*/i, '')
+    .replace(/[.,;:)\]}]+$/, '');
+}
+
+function findDoi(text) {
+  const match = String(text || '').match(DOI_RE);
+  return match ? normalizeDoi(match[0]) : '';
+}
+
+function crossrefDate(message) {
+  for (const key of ['published-print', 'published-online', 'published', 'issued']) {
+    const parts = message?.[key]?.['date-parts']?.[0];
+    if (parts?.[0]) return parts[0];
+  }
+  return null;
+}
+
+function crossrefPaper(message, fallbackDoi = '') {
+  const doi = normalizeDoi(message?.DOI || fallbackDoi);
+  const authors = (message?.author || []).map(a =>
+    a.family && a.given ? `${a.family}, ${a.given}` : a.family || a.name || ''
+  ).filter(Boolean);
+  return {
+    title: (message?.title || [''])[0] || '', authors, year: crossrefDate(message),
+    journal: (message?.['container-title'] || [])[0] || message?.publisher || '',
+    volume: message?.volume || '', number: message?.issue || '', pages: message?.page || '',
+    publisher: message?.publisher || '', doi,
+    url: doi ? `https://doi.org/${encodeURIComponent(doi).replace(/%2F/g, '/')}` : (message?.URL || ''),
+    abstract: message?.abstract ? message.abstract.replace(/<[^>]+>/g, '') : '',
+    citationCount: message?.['is-referenced-by-count'] ?? null
+  };
+}
+
+async function fetchCrossrefWorkByDoi(doi) {
+  const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(normalizeDoi(doi))}`);
+  if (!res.ok) throw new Error('DOIが見つかりません（CrossRef）');
+  const { message } = await res.json();
+  return crossrefPaper(message, doi);
+}
+
+function titleSimilarity(left, right) {
+  const words = value => new Set(String(value || '').toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').split(/\s+/).filter(w => w.length > 2));
+  const a = words(left), b = words(right);
+  if (!a.size || !b.size) return 0;
+  let common = 0;
+  for (const word of a) if (b.has(word)) common++;
+  return common / Math.max(a.size, b.size);
+}
+
+async function fetchCrossrefWorkByTitle(title) {
+  if (!title) return null;
+  const url = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(title)}&rows=5`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const items = (await res.json()).message?.items || [];
+  let best = null;
+  for (const item of items) {
+    const candidate = crossrefPaper(item);
+    const similarity = titleSimilarity(title, candidate.title);
+    if (!best || similarity > best.similarity) best = { candidate, similarity };
+  }
+  return best && best.similarity >= 0.6 ? best.candidate : null;
+}
+
+function bestPdfTitle(items) {
+  const candidates = (items || []).map(item => ({
+    text: String(item.str || '').trim(), size: Math.abs(item.transform?.[0] || 0), y: item.transform?.[5] || 0
+  })).filter(item => item.text.length > 8 && !/^https?:\/\//i.test(item.text));
+  candidates.sort((a, b) => b.size - a.size || b.y - a.y);
+  return candidates[0]?.text || '';
+}
+
 async function extractPDF(file) {
   const pdfJs = await getPdfJsLib();
   const buf = await file.arrayBuffer();
   const pdf = await pdfJs.getDocument({ data: buf }).promise;
   const meta = await pdf.getMetadata();
+  const infoValues = Object.values(meta.info || {}).join(' ');
   let title = meta.info?.Title || '';
   let author = meta.info?.Author || '';
-  if (!title) {
-    const page = await pdf.getPage(1);
+  let firstPageItems = [];
+  let extractedText = infoValues;
+  for (let pageNumber = 1; pageNumber <= Math.min(pdf.numPages, 3); pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
     const tc = await page.getTextContent();
-    let maxFs = 0, best = '';
-    for (const item of tc.items.slice(0, 15)) {
-      if (item.str.trim().length > 5) {
-        const fs = Math.abs(item.transform[0]);
-        if (fs > maxFs) { maxFs = fs; best = item.str.trim(); }
-      }
-    }
-    title = best;
+    if (pageNumber === 1) firstPageItems = tc.items;
+    extractedText += `\n${tc.items.map(item => item.str || '').join(' ')}`;
   }
-  const authors = author ? author.split(/[,;]/).map(a=>a.trim()).filter(Boolean) : [];
+  if (!title || /^untitled$/i.test(title)) title = bestPdfTitle(firstPageItems);
+  const doi = findDoi(extractedText);
+  let resolved = null;
+  try {
+    resolved = doi ? await fetchCrossrefWorkByDoi(doi) : await fetchCrossrefWorkByTitle(title);
+  } catch (e) { console.warn('PDF bibliographic lookup skipped', e); }
+  const localAuthors = author ? author.split(/[,;]/).map(a=>a.trim()).filter(Boolean) : [];
   return normalizePaper({
-    id: uid(), type: 'article', bibtexKey: '', title, authors,
+    id: uid(), type: 'article', bibtexKey: '', title, authors: localAuthors,
     year: null, journal:'', volume:'', number:'', pages:'', publisher:'',
-    doi:'', arxivId:'', url:'', abstract:'', citationCount: null,
+    doi, arxivId:'', url:'', abstract:'', citationCount: null,
     tags: [], collections: [], starred: false, readStatus: 'unread', notes: '',
     addedAt: new Date().toISOString(),
     pdfId: '', pdfName: file.name || '', pdfOriginalName: file.name || '', pdfPath: '', hasPdf: false,
-    supplementalFiles: []
+    supplementalFiles: [], ...resolved,
+    authors: resolved?.authors?.length ? resolved.authors : localAuthors,
+    title: resolved?.title || title, doi: resolved?.doi || doi
   });
 }
 function filtered() {
