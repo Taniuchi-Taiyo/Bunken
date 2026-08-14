@@ -398,13 +398,17 @@
       .s-btn.on-reading { background: #112A1E; }
     }
 
-    .col-select {
-      background: var(--bg-hover); border: 1px solid var(--border);
-      border-radius: var(--r-sm); padding: 5px 8px;
-      font-size: 12px; font-family: var(--ff); color: var(--text);
-      outline: none; cursor: pointer; min-width: 160px;
+    .col-checks {
+      display: flex; flex-direction: column; gap: 5px;
+      min-width: 190px; max-height: 180px; overflow-y: auto;
+      padding: 7px 9px; background: var(--bg-hover);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
     }
-    .col-select:focus { border-color: var(--accent); }
+    .col-check {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 12px; color: var(--text); cursor: pointer;
+    }
+    .col-check input { margin: 0; accent-color: var(--accent); cursor: pointer; }
 
     .notes-ta {
       width: 100%; background: var(--bg-hover);
@@ -2252,8 +2256,12 @@ function renderDetail() {
     p.hasPdf ? `<a class="d-link" href="#" data-action="open-pdf" data-id="${h(p.id)}">PDF を開く</a>` : ''
   ].filter(Boolean).join('');
 
-  const colOpts = `<option value="">—</option>` +
-    S.collections.map(c=>`<option value="${h(c.id)}" ${(p.collections||[]).includes(c.id)?'selected':''}>${h(c.name)}</option>`).join('');
+  const selectedCollections = new Set(p.collections||[]);
+  const colChecks = S.collections.map(c => `
+    <label class="col-check">
+      <input type="checkbox" data-collection-id="${h(c.id)}" ${selectedCollections.has(c.id)?'checked':''}>
+      <span>${h(c.name)}</span>
+    </label>`).join('');
 
   const tagsHtml = (p.tags||[]).map(t =>
     `<span class="tag-edit">${h(t)}<button type="button" data-action="remove-tag" data-id="${h(p.id)}" data-tag="${h(t)}">✕</button></span>`
@@ -2296,7 +2304,7 @@ function renderDetail() {
       </div>
       ${S.collections.length?`<div>
         <div class="d-sh" style="margin-bottom:6px;">コレクション</div>
-        <select class="col-select" data-action="set-collection" data-id="${h(p.id)}">${colOpts}</select>
+        <div class="col-checks" data-action="set-collection" data-id="${h(p.id)}" aria-label="コレクション（複数選択可）">${colChecks}</div>
       </div>`:''}
     </div>
     <hr class="d-div">
@@ -2361,9 +2369,14 @@ function tagKeydown(e, id) {
 }
 function tagBlur(el, id) { if(el.value.trim()){addTag(id,el.value);el.value='';} }
 
-function setCol(id, colId) {
+function setCol(id, collectionIds) {
   const p=S.papers.find(q=>q.id===id);
-  if (p) { p.collections=colId?[colId]:[]; save(); render(); }
+  if (p) {
+    const validIds = new Set(S.collections.map(c=>c.id));
+    p.collections = [...new Set((Array.isArray(collectionIds) ? collectionIds : [collectionIds])
+      .filter(colId => colId && validIds.has(colId)))];
+    save(); render();
+  }
 }
 function updNotes(id, v) { const p=S.papers.find(q=>q.id===id); if(p){p.notes=v;save();} }
 
@@ -3257,7 +3270,10 @@ document.addEventListener('change', async (event) => {
   else if (target.id === 'pdf-attach-global') await handleExistingPaperPdf(target);
   else if (target.id === 'supp-attach-global') await handleExistingPaperSupplement(target);
   else if (target.id === 'pdf-in') await handlePDF(target.files && target.files[0]);
-  else if (target.dataset.action === 'set-collection') setCol(target.dataset.id, target.value);
+  else if (target.closest('[data-action="set-collection"]')) {
+    const group = target.closest('[data-action="set-collection"]');
+    setCol(group.dataset.id, Array.from(group.querySelectorAll('input[data-collection-id]:checked'), input => input.dataset.collectionId));
+  }
   else if (target.dataset.action === 'notes-change') updNotes(target.dataset.id, target.value);
 });
 
