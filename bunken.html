@@ -614,6 +614,7 @@
         <span class="list-title" id="list-title">すべての文献</span>
         <button class="btn-sec" id="collection-dup-btn" type="button" data-action="show-collection-duplicates" style="display:none;">重複チェック</button>
         <button class="btn-sec" id="collection-bib-btn" type="button" data-action="show-collection-bib" style="display:none;">{ } BibTeX 一括</button>
+        <button class="btn-sec" id="collection-md-btn" type="button" data-action="show-collection-markdown" style="display:none;">✦ AI検索用 Markdown</button>
         <button class="btn-add" type="button" data-action="open-add-modal">＋ 追加</button>
       </div>
       <div class="search-wrap">
@@ -685,6 +686,22 @@
     <div class="modal-body" id="dup-modal-body"></div>
     <div class="modal-ft">
       <button class="btn-sec" type="button" data-action="close-modal" data-modal="dup-modal">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI MARKDOWN MODAL -->
+<div class="modal-ov" id="markdown-modal">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <span class="modal-hd-title">AI検索用 Markdown</span>
+      <button class="modal-x" type="button" data-action="close-modal" data-modal="markdown-modal">✕</button>
+    </div>
+    <div class="modal-body"><pre class="bib-out" id="markdown-out"></pre></div>
+    <div class="modal-ft">
+      <button class="btn-sec" type="button" data-action="copy-markdown">📋 コピー</button>
+      <button class="btn-sec" type="button" data-action="download-markdown">⬇ ダウンロード</button>
+      <button class="btn-sec" type="button" data-action="close-modal" data-modal="markdown-modal">閉じる</button>
     </div>
   </div>
 </div>
@@ -2150,6 +2167,7 @@ function renderList() {
   let title = labels[S.view] || '';
   const collectionBibBtn = document.getElementById('collection-bib-btn');
   const collectionDupBtn = document.getElementById('collection-dup-btn');
+  const collectionMdBtn = document.getElementById('collection-md-btn');
   if (S.view.startsWith('col:')) {
     const c=S.collections.find(c=>c.id===S.view.slice(4));
     title=c?`📁 ${c.name}`:'コレクション';
@@ -2161,6 +2179,10 @@ function renderList() {
       collectionDupBtn.style.display = c ? 'flex' : 'none';
       collectionDupBtn.dataset.collectionId = c ? c.id : '';
     }
+    if (collectionMdBtn) {
+      collectionMdBtn.style.display = c ? 'flex' : 'none';
+      collectionMdBtn.dataset.collectionId = c ? c.id : '';
+    }
   } else {
     if (collectionBibBtn) {
       collectionBibBtn.style.display = 'none';
@@ -2169,6 +2191,10 @@ function renderList() {
     if (collectionDupBtn) {
       collectionDupBtn.style.display = 'none';
       collectionDupBtn.dataset.collectionId = '';
+    }
+    if (collectionMdBtn) {
+      collectionMdBtn.style.display = 'none';
+      collectionMdBtn.dataset.collectionId = '';
     }
     if (S.view.startsWith('tag:')) title = `# ${S.view.slice(4)}`;
   }
@@ -2948,6 +2974,173 @@ function showCollectionBib(collectionId) {
   }
   setBibOutput(papers.map(genBib).join('\n\n'), `${sanitizeFilePart(collection.name || 'collection')}.bib`);
 }
+
+/* ============================================================
+   AI-READY MARKDOWN EXPORT
+============================================================ */
+function mdScalar(value) {
+  return JSON.stringify(String(value ?? ''));
+}
+
+function mdList(values) {
+  return `[${(Array.isArray(values) ? values : []).map(v => mdScalar(v)).join(', ')}]`;
+}
+
+function paperMarkdown(p, index) {
+  const title = plainText(p.title || '無題');
+  const authors = (p.authors || []).map(plainText);
+  const tags = (p.tags || []).map(plainText);
+  const collections = (p.collections || [])
+    .map(id => S.collections.find(c => c.id === id)?.name || id)
+    .map(plainText);
+  const links = [
+    p.doi ? `https://doi.org/${String(p.doi).replace(/^https?:\/\/(dx\.)?doi\.org\//i, '')}` : '',
+    p.url || '',
+    p.arxivId ? `https://arxiv.org/abs/${p.arxivId}` : ''
+  ].filter(Boolean);
+  const sourceFiles = [
+    p.pdfPath ? `PDF: ${p.pdfPath}` : '',
+    ...(p.supplementalFiles || []).map(f => f.path ? `補足資料: ${f.path}` : `補足資料: ${f.name || 'あり'}`)
+  ].filter(Boolean);
+  const notes = String(p.notes || '').trim();
+  const abstract = plainText(p.abstract || '').trim();
+  const key = p.bibtexKey || bKey(p);
+  const citation = p.citationCount != null ? p.citationCount : '不明';
+
+  return [
+    `## ${index}. ${title}`,
+    '',
+    '```yaml',
+    `id: ${mdScalar(p.id)}`,
+    `citation_key: ${mdScalar(key)}`,
+    `title: ${mdScalar(title)}`,
+    `authors: ${mdList(authors)}`,
+    `year: ${p.year || ''}`,
+    `journal: ${mdScalar(plainText(p.journal || ''))}`,
+    `doi: ${mdScalar(p.doi || '')}`,
+    `read_status: ${mdScalar(p.readStatus || 'unread')}`,
+    `tags: ${mdList(tags)}`,
+    `collections: ${mdList(collections)}`,
+    `citation_count: ${citation}`,
+    '```',
+    '',
+    links.length ? `**リンク:** ${links.map(link => `[${link}](${link})`).join(' · ')}` : '',
+    sourceFiles.length ? `**ローカル資料:** ${sourceFiles.join(' / ')}` : '**ローカル資料:** なし',
+    '',
+    '### 要旨',
+    abstract || '（要旨なし）',
+    '',
+    '### Bunkenメモ',
+    notes || '（メモなし）',
+    '',
+    '### AI検索用の確認事項',
+    '- この論文の主張・手法・条件・限界を分けて整理する。',
+    '- 他の論文と一致する結果、相反する結果、未検証の点を抽出する。',
+    '- 根拠が要旨だけの場合は、その旨を明記する。'
+  ].filter((line, i, arr) => !(line === '' && arr[i - 1] === '' && arr[i + 1] === '')).join('\n');
+}
+
+function genCollectionMarkdown(collection, papers) {
+  const sorted = [...papers].sort((a, b) => {
+    const ay = Number(a.year) || 0;
+    const by = Number(b.year) || 0;
+    return by - ay || plainText(a.title || '').localeCompare(plainText(b.title || ''));
+  });
+  const tags = [...new Set(sorted.flatMap(p => p.tags || []))].sort((a, b) => a.localeCompare(b));
+  const years = sorted.map(p => Number(p.year)).filter(Number.isFinite);
+  const questions = [
+    `「${collection.name}」の文献群から、主要な研究テーマを3〜5個に整理してください。`,
+    '各論文について、研究目的・手法・条件・主要結果・限界を比較表にしてください。',
+    '論文間で一致している知見と、相反している知見を分けてください。',
+    'この文献群から見た未解決問題と、次に読むべき論文を提案してください。'
+  ];
+  return [
+    '---',
+    `name: ${mdScalar(collection.name)}`,
+    `exported_at: ${mdScalar(new Date().toISOString())}`,
+    `paper_count: ${sorted.length}`,
+    `year_range: ${years.length ? `${Math.min(...years)}-${Math.max(...years)}` : '不明'}`,
+    `tags: ${mdList(tags)}`,
+    'purpose: "生成AIによる文献検索・比較・レビュー支援"',
+    '---',
+    '',
+    `# ${plainText(collection.name)} — AI検索用文献パック`,
+    '',
+    '> このファイルはBunkenから出力した文献情報です。書誌情報・要旨・メモを根拠として扱い、本文未確認の内容は推測しないでください。',
+    '',
+    '## 使い方',
+    '',
+    '以下の文献情報を使って、文献検索・比較・研究課題の整理を行ってください。DOIやローカルPDFの参照先は原文確認用です。',
+    '',
+    '### 推奨プロンプト',
+    ...questions.map(q => `- ${q}`),
+    '',
+    '## 文献一覧',
+    '',
+    ...sorted.map((p, i) => `- [${i + 1}. ${plainText(p.title || '無題')}](#${i + 1}-${plainText(p.title || '無題').toLowerCase().replace(/[^a-z0-9一-龠ぁ-んァ-ヶ]+/g, '-')})`),
+    '',
+    ...sorted.map((p, i) => paperMarkdown(p, i + 1))
+  ].join('\n');
+}
+
+function setMarkdownOutput(content, filename) {
+  const out = document.getElementById('markdown-out');
+  out.textContent = content;
+  out.dataset.filename = filename;
+  document.getElementById('markdown-modal').classList.add('open');
+}
+
+async function showCollectionMarkdown(collectionId) {
+  const collection = S.collections.find(c => c.id === collectionId);
+  if (!collection) return;
+  const papers = S.papers.filter(p => (p.collections || []).includes(collectionId));
+  if (!papers.length) {
+    toast('このコレクションに文献がありません');
+    return;
+  }
+  const filename = `${sanitizeFilePart(collection.name || 'collection')}_ai-search.md`;
+  const content = genCollectionMarkdown(collection, papers);
+  setMarkdownOutput(content, filename);
+  await saveMarkdownToStorage(content, filename, { notify: true });
+}
+
+function cpMarkdown() {
+  navigator.clipboard.writeText(document.getElementById('markdown-out').textContent)
+    .then(() => toast('Markdownをコピーしました'));
+}
+
+async function saveMarkdownToStorage(content, filename, { notify = false } = {}) {
+  if (!(STORAGE_STATE.available && STORAGE_STATE.folderHandle)) return false;
+  try {
+    const ok = await ensureFolderPermission(STORAGE_STATE.folderHandle);
+    if (!ok) throw new Error('保存先フォルダへの書き込み権限がありません');
+    const aiDir = await getOrCreateDirectory(STORAGE_STATE.folderHandle, 'ai-search');
+    await writeBlobToFile(aiDir, filename, new Blob([content], { type: 'text/markdown;charset=utf-8' }));
+    if (notify) toast(`Markdownを更新しました: ai-search/${filename}`);
+    return true;
+  } catch (err) {
+    console.warn('AI検索用Markdownの保存先フォルダへの書き込みに失敗しました', err);
+    if (notify) toast('Markdownを保存できませんでした。保存先フォルダの権限を確認してください');
+    return false;
+  }
+}
+
+async function dlMarkdown() {
+  const out = document.getElementById('markdown-out');
+  const filename = out.dataset.filename || 'collection_ai-search.md';
+  const content = out.textContent || '';
+
+  if (await saveMarkdownToStorage(content, filename, { notify: true })) {
+    return;
+  }
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: 'text/markdown;charset=utf-8' }));
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 function cpBib() {
   navigator.clipboard.writeText(document.getElementById('bib-out').textContent)
     .then(()=>toast('コピーしました'));
@@ -2982,6 +3175,8 @@ document.addEventListener('click', async (event) => {
       case 'save-modal': await saveModal(); break;
       case 'copy-bib': cpBib(); break;
       case 'download-bib': dlBib(); break;
+      case 'copy-markdown': cpMarkdown(); break;
+      case 'download-markdown': await dlMarkdown(); break;
       case 'choose-storage-folder': await chooseStorageFolder(); break;
       case 'toggle-realtime-sync': await toggleRealtimeSync(); break;
       case 'import-from-folder': await importDataFromChosenFolderPrompt(); break;
@@ -3031,6 +3226,7 @@ document.addEventListener('click', async (event) => {
       case 'open-edit-modal': openEditModal(id); break;
       case 'show-bib': showBib(id); break;
       case 'show-collection-bib': showCollectionBib(collectionId || (S.view.startsWith('col:') ? S.view.slice(4) : '')); break;
+      case 'show-collection-markdown': await showCollectionMarkdown(collectionId || (S.view.startsWith('col:') ? S.view.slice(4) : '')); break;
       case 'show-collection-duplicates': openDuplicateModal(collectionId || (S.view.startsWith('col:') ? S.view.slice(4) : '')); break;
       case 'resolve-duplicate-group': resolveDuplicateGroup(groupIndex, id); break;
       case 'remove-duplicate-from-collection': removeDuplicateFromCollection(id); break;
