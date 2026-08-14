@@ -11,6 +11,7 @@ Bunken is a lightweight reference manager designed for researchers.
 - Extract metadata from PDFs
 - Automatically organize and store PDFs and supplementary files
 - Organize papers with tags and collections
+- Assign one paper to multiple collections
 - Track reading status
 - Save notes
 - Export BibTeX
@@ -29,6 +30,14 @@ Bunken is a lightweight reference manager designed for researchers.
 - No server is required
 - If you choose a folder synced by Dropbox, Google Drive, or similar services, you can access the same library from multiple devices
 - Supported browsers: Chrome and Edge
+
+## Community and support
+
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Contributing Guide](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+
+Please use [GitHub Issues](https://github.com/Taniuchi-Taiyo/Bunken/issues) for bug reports and feature requests. For security vulnerabilities, please follow the [Security Policy](SECURITY.md) instead of opening a public issue.
 
 ## License
 
