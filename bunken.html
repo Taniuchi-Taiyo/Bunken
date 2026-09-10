@@ -221,8 +221,10 @@
     }
     .list-hd-top {
       display: flex; align-items: center; gap: 8px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
+    .list-tools { display: none; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+    .list-tools.on { display: flex; }
     .list-title { font-size: 13px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .btn-add {
       display: flex; align-items: center; gap: 4px;
@@ -264,6 +266,11 @@
     }
     .paper-item:hover { background: var(--bg-hover); }
     .paper-item.sel { background: var(--bg-sel); }
+    .paper-item:focus-visible, .side-item:focus-visible,
+    button:focus-visible, input:focus-visible, select:focus-visible,
+    textarea:focus-visible, summary:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: -2px;
+    }
 
     .pi-top { display: flex; align-items: flex-start; gap: 5px; margin-bottom: 3px; }
     .pi-star {
@@ -344,6 +351,13 @@
       display: flex; align-items: baseline; gap: 5px;
     }
     .d-cit strong { font-size: 18px; font-weight: 600; color: var(--text); }
+    .cite-key {
+      display: inline-flex; align-items: center; gap: 7px;
+      margin: 0 0 12px; padding: 4px 9px;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      background: var(--bg-hover); color: var(--text-2);
+      font-family: var(--fm); font-size: 11px;
+    }
 
     .d-div { border: none; border-top: 1px solid var(--border-lt); margin: 14px 0; }
     .d-sh {
@@ -511,6 +525,9 @@
     .fta { resize: vertical; min-height: 80px; line-height: 1.5; }
     .frow { display: flex; gap: 10px; }
     .frow .fg { flex: 1; min-width: 0; }
+    .form-details { margin: 4px 0 13px; }
+    .form-details summary { cursor: pointer; color: var(--text-2); font-size: 12px; }
+    .form-details-body { padding-top: 12px; }
 
     .fetch-row { display: flex; gap: 8px; }
     .fetch-row .fi { flex: 1; }
@@ -606,6 +623,7 @@
       border-radius: 50%; animation: rot .6s linear infinite;
     }
     @keyframes rot { to { transform: rotate(360deg); } }
+
   </style>
 </head>
 <body>
@@ -616,20 +634,23 @@
     <div class="list-hd">
       <div class="list-hd-top">
         <span class="list-title" id="list-title">すべての文献</span>
-        <button class="btn-sec" id="collection-dup-btn" type="button" data-action="show-collection-duplicates" style="display:none;">重複チェック</button>
-        <button class="btn-sec" id="collection-bib-btn" type="button" data-action="show-collection-bib" style="display:none;">{ } BibTeX 一括</button>
-        <button class="btn-sec" id="collection-md-btn" type="button" data-action="show-collection-markdown" style="display:none;">✦ AI検索用 Markdown</button>
         <button class="btn-add" type="button" data-action="open-add-modal">＋ 追加</button>
+      </div>
+      <div class="list-tools" id="collection-tools" aria-label="コレクション操作">
+        <button class="btn-sec" id="collection-bib-btn" type="button" data-action="show-collection-bib">{ } BibTeX</button>
+        <button class="btn-sec" id="collection-cite-btn" type="button" data-action="copy-collection-cite">\\cite をコピー</button>
+        <button class="btn-sec" id="collection-dup-btn" type="button" data-action="show-collection-duplicates">重複チェック</button>
+        <button class="btn-sec" id="collection-md-btn" type="button" data-action="show-collection-markdown">AI用 Markdown</button>
       </div>
       <div class="search-wrap">
         <span class="si">🔍</span>
-        <input type="text" id="srch" placeholder="タイトル・著者・キーワードで検索...">
+        <input type="text" id="srch" aria-label="文献を検索" placeholder="タイトル・著者・キーワードで検索...">
       </div>
       <div class="filter-row">
-        <select id="fa" title="著者フィルタ"><option value="">著者…</option></select>
-        <select id="fy" title="年フィルタ"><option value="">年…</option></select>
-        <select id="fj" title="誌名フィルタ"><option value="">誌名…</option></select>
-        <select id="sort" title="並び替え">
+        <select id="fa" aria-label="著者で絞り込み" title="著者フィルタ"><option value="">著者…</option></select>
+        <select id="fy" aria-label="年で絞り込み" title="年フィルタ"><option value="">年…</option></select>
+        <select id="fj" aria-label="誌名で絞り込み" title="誌名フィルタ"><option value="">誌名…</option></select>
+        <select id="sort" aria-label="並び替え" title="並び替え">
           <option value="addedAt">追加順</option>
           <option value="year">年</option>
           <option value="title">タイトル</option>
@@ -644,11 +665,11 @@
 </div>
 
 <!-- ADD/EDIT MODAL -->
-<div class="modal-ov" id="add-modal">
-  <div class="modal-box">
+<div class="modal-ov" id="add-modal" role="dialog" aria-modal="true" aria-labelledby="modal-hd-title">
+  <div class="modal-box" tabindex="-1">
     <div class="modal-hd">
       <span class="modal-hd-title" id="modal-hd-title">文献を追加</span>
-      <button class="modal-x" type="button" data-action="close-modal" data-modal="add-modal">✕</button>
+      <button class="modal-x" type="button" aria-label="閉じる" data-action="close-modal" data-modal="add-modal">✕</button>
     </div>
     <div class="modal-tabs" id="modal-tabs">
       <button class="m-tab on" type="button" data-action="switch-tab" data-tab="doi">DOI / arXiv</button>
@@ -665,11 +686,11 @@
 </div>
 
 <!-- BIBTEX MODAL -->
-<div class="modal-ov" id="bib-modal">
-  <div class="modal-box">
+<div class="modal-ov" id="bib-modal" role="dialog" aria-modal="true" aria-labelledby="bib-modal-title">
+  <div class="modal-box" tabindex="-1">
     <div class="modal-hd">
-      <span class="modal-hd-title">BibTeX 出力</span>
-      <button class="modal-x" type="button" data-action="close-modal" data-modal="bib-modal">✕</button>
+      <span class="modal-hd-title" id="bib-modal-title">BibTeX 出力</span>
+      <button class="modal-x" type="button" aria-label="閉じる" data-action="close-modal" data-modal="bib-modal">✕</button>
     </div>
     <div class="modal-body"><pre class="bib-out" id="bib-out"></pre></div>
     <div class="modal-ft">
@@ -681,11 +702,11 @@
 </div>
 
 <!-- DUPLICATE MODAL -->
-<div class="modal-ov" id="dup-modal">
-  <div class="modal-box">
+<div class="modal-ov" id="dup-modal" role="dialog" aria-modal="true" aria-labelledby="dup-modal-title">
+  <div class="modal-box" tabindex="-1">
     <div class="modal-hd">
       <span class="modal-hd-title" id="dup-modal-title">重複チェック</span>
-      <button class="modal-x" type="button" data-action="close-modal" data-modal="dup-modal">✕</button>
+      <button class="modal-x" type="button" aria-label="閉じる" data-action="close-modal" data-modal="dup-modal">✕</button>
     </div>
     <div class="modal-body" id="dup-modal-body"></div>
     <div class="modal-ft">
@@ -695,11 +716,11 @@
 </div>
 
 <!-- AI MARKDOWN MODAL -->
-<div class="modal-ov" id="markdown-modal">
-  <div class="modal-box">
+<div class="modal-ov" id="markdown-modal" role="dialog" aria-modal="true" aria-labelledby="markdown-modal-title">
+  <div class="modal-box" tabindex="-1">
     <div class="modal-hd">
-      <span class="modal-hd-title">AI検索用 Markdown</span>
-      <button class="modal-x" type="button" data-action="close-modal" data-modal="markdown-modal">✕</button>
+      <span class="modal-hd-title" id="markdown-modal-title">AI検索用 Markdown</span>
+      <button class="modal-x" type="button" aria-label="閉じる" data-action="close-modal" data-modal="markdown-modal">✕</button>
     </div>
     <div class="modal-body"><pre class="bib-out" id="markdown-out"></pre></div>
     <div class="modal-ft">
@@ -712,7 +733,7 @@
 
 <input type="file" id="pdf-attach-global" accept=".pdf,application/pdf" style="display:none">
 <input type="file" id="supp-attach-global" multiple style="display:none">
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const PDFJS_MODULE_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.mjs';
@@ -779,6 +800,7 @@ let M = {
   editId: null,
   pending: null   // paper from fetch/parse awaiting save
 };
+let lastModalTrigger = null;
 
 let D = {
   collectionId: '',
@@ -871,17 +893,21 @@ function normalizePaper(p) {
   return {
     id: safeId,
     type: normalizeType(p?.type),
-    bibtexKey: sanitizeText(p?.bibtexKey, 120),
+    bibtexKey: normalizeBibKey(p?.bibtexKey),
     title: sanitizeText(p?.title, 500),
     authors: sanitizeStringArray(Array.isArray(p?.authors) ? p.authors : [], 40, 160),
     year: normalizeYear(p?.year),
     journal: sanitizeText(p?.journal, 240),
+    booktitle: sanitizeText(p?.booktitle, 240),
     volume: sanitizeText(p?.volume, 40),
     number: sanitizeText(p?.number, 40),
     pages: sanitizeText(p?.pages, 60),
     publisher: sanitizeText(p?.publisher, 240),
-    doi: sanitizeText(p?.doi, 256),
-    arxivId: sanitizeText(p?.arxivId, 128),
+    school: sanitizeText(p?.school, 240),
+    doi: normalizeDoi(p?.doi),
+    arxivId: normalizeArxivId(p?.arxivId),
+    archivePrefix: sanitizeText(p?.archivePrefix, 40),
+    primaryClass: sanitizeText(p?.primaryClass, 80),
     url: sanitizeExternalUrl(p?.url),
     abstract: sanitizeText(p?.abstract, 12000),
     citationCount: normalizeCount(p?.citationCount),
@@ -912,10 +938,15 @@ function normalizePaper(p) {
 }
 
 function load() {
+  let raw = '';
   try {
-    const d = localStorage.getItem('bunken_v1');
-    if (d) { const p = JSON.parse(d); S.papers = (p.papers||[]).map(normalizePaper); S.collections = Array.isArray(p.collections) ? p.collections.map(normalizeCollection) : []; }
-  } catch(e) {}
+    raw = localStorage.getItem('bunken_v1') || '';
+    if (raw) { const p = JSON.parse(raw); S.papers = (p.papers||[]).map(normalizePaper); S.collections = Array.isArray(p.collections) ? p.collections.map(normalizeCollection) : []; }
+  } catch(e) {
+    console.error('library load failed', e);
+    try { if (raw) localStorage.setItem(`bunken_v1_corrupt_${Date.now()}`, raw); } catch (_) {}
+    toast('ライブラリを読み込めませんでした。破損データはブラウザ内に退避しました');
+  }
 }
 function save() {
   try { localStorage.setItem('bunken_v1', JSON.stringify({ papers: S.papers, collections: S.collections })); }
@@ -1051,10 +1082,11 @@ async function deleteSetting(key) {
   });
 }
 
-async function ensureFolderPermission(handle) {
+async function ensureFolderPermission(handle, { request = true } = {}) {
   if (!handle) return false;
   const opts = { mode: 'readwrite' };
   if (handle.queryPermission && (await handle.queryPermission(opts)) === 'granted') return true;
+  if (!request) return false;
   if (handle.requestPermission && (await handle.requestPermission(opts)) === 'granted') return true;
   return false;
 }
@@ -1146,7 +1178,7 @@ function setSyncBaseline(data) {
   STORAGE_STATE.syncBaseline = canonicalizeLibraryData(data || {});
   STORAGE_STATE.localDiff = { added: 0, removed: 0, modified: 0 };
   STORAGE_STATE.remoteDiff = { added: 0, removed: 0, modified: 0 };
-  try { putSetting('syncBaseline', STORAGE_STATE.syncBaseline); } catch (_) {}
+  putSetting('syncBaseline', STORAGE_STATE.syncBaseline).catch(err => console.warn('sync baseline save failed', err));
 }
 
 function recomputeLocalDiff() {
@@ -1168,7 +1200,7 @@ async function refreshRemoteDiff() {
 
   STORAGE_STATE.remoteScanInFlight = (async () => {
     try {
-      const ok = await ensureFolderPermission(STORAGE_STATE.folderHandle);
+      const ok = await ensureFolderPermission(STORAGE_STATE.folderHandle, { request: false });
       if (!ok) throw new Error('保存先フォルダへのアクセス権限がありません');
       let remoteData = { papers: [], collections: [] };
       try {
@@ -1229,7 +1261,7 @@ async function restoreStorageFolder() {
 
     if (handle && STORAGE_STATE.realtimeSync) {
       try {
-        const ok = await ensureFolderPermission(handle);
+        const ok = await ensureFolderPermission(handle, { request: false });
         if (ok) {
           let hasRemoteLibrary = false;
           try {
@@ -1237,8 +1269,12 @@ async function restoreStorageFolder() {
             hasRemoteLibrary = true;
           } catch (_) {}
           if (hasRemoteLibrary) {
-            await importDataFromFolder(handle, { replaceExisting: true, showToast: false, askConfirm: false });
-            STORAGE_STATE.lastSyncedAt = lastSyncedAt || STORAGE_STATE.lastSyncedAt || '';
+            if (diffHasChanges(STORAGE_STATE.localDiff)) {
+              toast('未同期のブラウザ内変更があるため、保存先の自動読み込みを停止しました');
+            } else {
+              await importDataFromFolder(handle, { replaceExisting: true, showToast: false, askConfirm: false });
+              STORAGE_STATE.lastSyncedAt = lastSyncedAt || STORAGE_STATE.lastSyncedAt || '';
+            }
           }
         }
       } catch (e) {
@@ -1499,8 +1535,27 @@ async function syncAllDataToChosenFolder(showToast = false) {
 
   STORAGE_STATE.syncInFlight = (async () => {
     const handle = STORAGE_STATE.folderHandle;
-    const ok = await ensureFolderPermission(handle);
-    if (!ok) throw new Error('保存先フォルダへの書き込み権限がありません');
+    const ok = await ensureFolderPermission(handle, { request: showToast });
+    if (!ok) {
+      if (!showToast) {
+        toast('保存先フォルダの権限がないため、自動同期を停止しました');
+        return false;
+      }
+      throw new Error('保存先フォルダへの書き込み権限がありません');
+    }
+
+    await refreshRemoteDiff();
+    if (diffHasChanges(STORAGE_STATE.remoteDiff)) {
+      if (!showToast) {
+        toast('保存先に別の変更があるため、自動同期を停止しました');
+        return false;
+      }
+      const overwrite = confirm('保存先に別の変更があります。現在のブラウザの内容で上書きしますか？\nキャンセルすると保存先は変更されません。');
+      if (!overwrite) return false;
+    }
+    let remoteFingerprintAtStart = '';
+    try { remoteFingerprintAtStart = stableFingerprint(await readJsonFile(handle, 'bunken-library.json')); }
+    catch (_) {}
 
     const pdfDir = await getOrCreateDirectory(handle, 'pdfs');
     const suppDir = await getOrCreateDirectory(handle, 'supplementals');
@@ -1508,7 +1563,8 @@ async function syncAllDataToChosenFolder(showToast = false) {
     const usedPdfNames = new Set();
     const usedSupplementNames = new Set();
 
-    for (const paper of S.papers) {
+    const nextPapers = S.papers.map(paper => normalizePaper(JSON.parse(JSON.stringify(paper))));
+    for (const paper of nextPapers) {
       if (paper.hasPdf && paper.pdfId) {
         const rec = await getPdfBlob(paper.pdfId);
         if (rec && rec.blob) {
@@ -1537,10 +1593,17 @@ async function syncAllDataToChosenFolder(showToast = false) {
 
     const exportData = {
       savedAt: new Date().toISOString(),
-      papers: S.papers,
+      papers: nextPapers,
       collections: S.collections
     };
+    let latestRemoteFingerprint = '';
+    try { latestRemoteFingerprint = stableFingerprint(await readJsonFile(handle, 'bunken-library.json')); }
+    catch (_) {}
+    if (latestRemoteFingerprint !== remoteFingerprintAtStart) {
+      throw new Error('同期中に保存先が更新されたため、ライブラリの上書きを中止しました');
+    }
     await writeJsonFile(handle, 'bunken-library.json', exportData);
+    S.papers = nextPapers;
 
     const oldPathsRaw = await getSetting('syncedPaths');
     const oldPaths = Array.isArray(oldPathsRaw) ? oldPathsRaw : [];
@@ -1813,35 +1876,172 @@ function bKey(p) {
   const titleText = plainText(p.title || '');
   const tw = titleText.split(/\s+/)
     .find(w => w.length > 3 && !skip.test(w)) || titleText.split(/\s+/)[0] || 'paper';
-  return fa + yr + tw.replace(/[^a-zA-Z0-9]/g,'').toLowerCase().slice(0,8);
+  return normalizeBibKey(fa + yr + tw.replace(/[^a-zA-Z0-9]/g,'').toLowerCase().slice(0,8)) || `ref${yr}`;
+}
+
+function findDuplicateBibKey(key, excludeId = '') {
+  const normalized = normalizeBibKey(key).toLowerCase();
+  return normalized ? S.papers.find(p => p.id !== excludeId && normalizeBibKey(p.bibtexKey || bKey(p)).toLowerCase() === normalized) : null;
+}
+
+function nextAvailableBibKey(base, usedKeys = new Set(), excludeId = '') {
+  const clean = normalizeBibKey(base) || 'reference';
+  const used = new Set([
+    ...S.papers.filter(p => p.id !== excludeId).map(p => normalizeBibKey(p.bibtexKey || bKey(p)).toLowerCase()),
+    ...[...usedKeys].map(k => String(k).toLowerCase())
+  ]);
+  if (!used.has(clean.toLowerCase())) return clean;
+  for (let suffix = 0; suffix < 26; suffix++) {
+    const candidate = `${clean}${String.fromCharCode(97 + suffix)}`;
+    if (!used.has(candidate.toLowerCase())) return candidate;
+  }
+  let n = 2;
+  while (used.has(`${clean}${n}`.toLowerCase())) n++;
+  return `${clean}${n}`;
 }
 
 /* ============================================================
    BIBTEX PARSER
 ============================================================ */
-function parseBib(txt) {
-  const tm = txt.match(/@(\w+)\s*\{/i);
-  if (!tm) return null;
-  const type = tm[1].toLowerCase();
-  const km = txt.match(/@\w+\s*\{\s*([^,\s]+)/);
-  const bk = km ? km[1] : '';
-  const fields = {};
-  const re = /(\w+)\s*=\s*(?:\{((?:[^{}]|\{[^{}]*\})*)\}|"([^"]*)"|(\d+))/g;
-  let m;
-  while ((m = re.exec(txt)) !== null) {
-    fields[m[1].toLowerCase()] = (m[2]!=null?m[2]:(m[3]!=null?m[3]:m[4])).trim();
+function splitBibEntries(text) {
+  const source = String(text || '').split(/\r?\n/).map(line => {
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '%' && line[i - 1] !== '\\') return line.slice(0, i);
+    }
+    return line;
+  }).join('\n');
+  const entries = [];
+  let cursor = 0;
+  while (cursor < source.length) {
+    const match = /@([A-Za-z]+)\s*([\{(])/g;
+    match.lastIndex = cursor;
+    const found = match.exec(source);
+    if (!found) break;
+    const type = found[1].toLowerCase();
+    const open = found[2], close = open === '{' ? '}' : ')';
+    let depth = 1, quoted = false, escaped = false, end = match.lastIndex;
+    for (; end < source.length; end++) {
+      const ch = source[end];
+      if (escaped) { escaped = false; continue; }
+      if (ch === '\\') { escaped = true; continue; }
+      if (ch === '"') { quoted = !quoted; continue; }
+      if (quoted) continue;
+      if (ch === open) depth++;
+      else if (ch === close && --depth === 0) { end++; break; }
+    }
+    if (depth !== 0) throw new Error(`${found[1]} エントリの括弧が閉じていません`);
+    if (!['comment', 'preamble', 'string'].includes(type)) entries.push(source.slice(found.index, end));
+    cursor = end;
   }
-  const authors = fields.author ? fields.author.split(' and ').map(a=>a.trim()).filter(Boolean) : [];
-  const typeMap = { inproceedings:'inproceedings', conference:'inproceedings', book:'book', misc:'misc', phdthesis:'phdthesis', mastersthesis:'mastersthesis' };
-  const pt = typeMap[type] || 'article';
+  return entries;
+}
+
+function findTopLevelComma(text) {
+  let depth = 0, quoted = false, escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
+    if (ch === '"') { quoted = !quoted; continue; }
+    if (quoted) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') depth--;
+    else if (ch === ',' && depth === 0) return i;
+  }
+  return -1;
+}
+
+function parseBibFields(text) {
+  const fields = {};
+  let i = 0;
+  while (i < text.length) {
+    while (i < text.length && /[\s,]/.test(text[i])) i++;
+    const nameMatch = /^[A-Za-z][\w-]*/.exec(text.slice(i));
+    if (!nameMatch) { i++; continue; }
+    const name = nameMatch[0].toLowerCase();
+    i += nameMatch[0].length;
+    while (/\s/.test(text[i] || '')) i++;
+    if (text[i] !== '=') { while (i < text.length && text[i] !== ',') i++; continue; }
+    i++;
+    while (/\s/.test(text[i] || '')) i++;
+    let value = '';
+    if (text[i] === '{') {
+      let depth = 1, escaped = false;
+      const start = ++i;
+      for (; i < text.length; i++) {
+        const ch = text[i];
+        if (escaped) { escaped = false; continue; }
+        if (ch === '\\') { escaped = true; continue; }
+        if (ch === '{') depth++;
+        else if (ch === '}' && --depth === 0) break;
+      }
+      if (depth !== 0) throw new Error(`${name} フィールドの括弧が閉じていません`);
+      value = text.slice(start, i++);
+    } else if (text[i] === '"') {
+      const start = ++i;
+      let escaped = false;
+      for (; i < text.length; i++) {
+        if (escaped) { escaped = false; continue; }
+        if (text[i] === '\\') { escaped = true; continue; }
+        if (text[i] === '"') break;
+      }
+      value = text.slice(start, i++);
+    } else {
+      const start = i;
+      while (i < text.length && text[i] !== ',') i++;
+      value = text.slice(start, i);
+    }
+    while (/\s/.test(text[i] || '')) i++;
+    if (text[i] === '#' || /(^|[^\\])#/.test(value)) {
+      throw new Error(`${name} フィールドの # による値連結には対応していません`);
+    }
+    fields[name] = value.trim();
+  }
+  return fields;
+}
+
+function splitBibAuthors(value) {
+  const authors = [];
+  let depth = 0, start = 0;
+  const text = String(value || '');
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}') depth--;
+    else if (depth === 0 && /^\s+and\s+/i.test(text.slice(i))) {
+      authors.push(text.slice(start, i).trim());
+      const separator = /^\s+and\s+/i.exec(text.slice(i))[0];
+      i += separator.length - 1;
+      start = i + 1;
+    }
+  }
+  authors.push(text.slice(start).trim());
+  return authors.filter(Boolean);
+}
+
+function parseBibEntry(txt) {
+  const match = /^\s*@([A-Za-z]+)\s*([\{(])([\s\S]*)[\})]\s*$/.exec(txt);
+  if (!match) throw new Error('BibTeXエントリを解析できません');
+  const sourceType = match[1].toLowerCase();
+  const body = match[3];
+  const comma = findTopLevelComma(body);
+  if (comma < 0) throw new Error('Citation keyの後にカンマがありません');
+  const bk = normalizeBibKey(body.slice(0, comma));
+  const fields = parseBibFields(body.slice(comma + 1));
+  const authors = splitBibAuthors(fields.author);
+  const typeMap = {
+    article:'article', inproceedings:'inproceedings', conference:'inproceedings',
+    incollection:'inproceedings', book:'book', booklet:'book', preprint:'preprint',
+    misc:'misc', online:'misc', techreport:'misc', phdthesis:'phdthesis', mastersthesis:'mastersthesis'
+  };
+  const type = typeMap[sourceType] || 'misc';
   return {
-    id: uid(), type: pt, bibtexKey: bk,
+    id: uid(), type: type, bibtexKey: bk,
     title: fields.title||'', authors,
     year: parseInt(fields.year)||null,
-    journal: fields.journal||fields.booktitle||fields.publisher||'',
+    journal: fields.journal||'', booktitle: fields.booktitle||'',
     volume: fields.volume||'', number: fields.number||'', pages: fields.pages||'',
-    publisher: fields.publisher||'', doi: fields.doi||'',
-    arxivId: fields.eprint||'', url: fields.url||'',
+    publisher: fields.publisher||'', school: fields.school||fields.institution||'', doi: fields.doi||'',
+    arxivId: fields.eprint||'', archivePrefix: fields.archiveprefix||'', primaryClass: fields.primaryclass||'', url: fields.url||'',
     abstract: fields.abstract||'', citationCount: null,
     tags: [], collections: [], starred: false, readStatus: 'unread', notes: '',
     addedAt: new Date().toISOString(),
@@ -1849,34 +2049,101 @@ function parseBib(txt) {
   };
 }
 
+function parseBibEntries(txt) {
+  return splitBibEntries(txt).map(parseBibEntry);
+}
+
+function parseBib(txt) {
+  return parseBibEntries(txt)[0] || null;
+}
+
 /* ============================================================
    BIBTEX GENERATOR
 ============================================================ */
-function genBib(p) {
+function escapeBibText(value) {
+  const text = plainText(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if ('%&#_'.includes(ch) && text[i - 1] !== '\\') out += '\\';
+    out += ch;
+  }
+  return out;
+}
+
+function hasOuterBibBraces(value) {
+  const text = String(value || '').trim();
+  if (!text.startsWith('{') || !text.endsWith('}')) return false;
+  let depth = 0, escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    if (escaped) { escaped = false; continue; }
+    if (text[i] === '\\') { escaped = true; continue; }
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}' && --depth === 0 && i < text.length - 1) return false;
+  }
+  return depth === 0;
+}
+
+function genBib(p, options = {}) {
+  const includeAbstract = options.includeAbstract === true;
   const tMap = { article:'article', inproceedings:'inproceedings', book:'book', preprint:'misc', misc:'misc', phdthesis:'phdthesis', mastersthesis:'mastersthesis' };
   const t = tMap[p.type]||'misc';
-  const k = p.bibtexKey || bKey(p);
-  const lines = [`@${t}{${k},`];
-  const f = (n,v) => { if (v) lines.push(`  ${n} = {${v}},`); };
-  f('title', p.title);
-  if (p.authors&&p.authors.length) lines.push(`  author = {${p.authors.join(' and ')}},`);
-  f('year', p.year);
-  const jf = p.type==='inproceedings'?'booktitle':'journal';
-  f(jf, p.journal);
-  f('volume', p.volume); f('number', p.number); f('pages', p.pages);
-  f('publisher', p.publisher); f('doi', p.doi); f('url', p.url);
-  if (p.arxivId) lines.push(`  eprint = {${p.arxivId}},`);
-  f('abstract', p.abstract);
-  lines.push('}');
-  return lines.join('\n');
+  const k = normalizeBibKey(options.key || p.bibtexKey || bKey(p)) || 'reference';
+  const fields = [];
+  const f = (name, value, mode = 'text') => {
+    if (value == null || value === '') return;
+    const escaped = mode === 'literal' ? String(value).trim() : escapeBibText(value);
+    fields.push([name, escaped]);
+  };
+  if (p.authors?.length) f('author', p.authors.join(' and '));
+  if (p.title) {
+    const title = escapeBibText(p.title);
+    fields.push(['title', hasOuterBibBraces(title) ? title : `{${title}}`]);
+  }
+  if (p.type === 'article') f('journal', p.journal);
+  if (p.type === 'inproceedings') f('booktitle', p.booktitle || p.journal);
+  f('year', p.year, 'literal');
+  if (['article', 'inproceedings'].includes(p.type)) {
+    f('volume', p.volume); f('number', p.number); f('pages', p.pages);
+  }
+  if (p.publisher) f('publisher', p.publisher);
+  if (['phdthesis', 'mastersthesis'].includes(p.type)) f('school', p.school || p.publisher);
+  if (p.type === 'misc' && p.school) f('institution', p.school);
+  f('doi', normalizeDoi(p.doi), 'literal');
+  if (p.arxivId) {
+    f('eprint', normalizeArxivId(p.arxivId), 'literal');
+    f('archivePrefix', p.archivePrefix || 'arXiv', 'literal');
+    f('primaryClass', p.primaryClass, 'literal');
+  }
+  if (!p.doi && !p.arxivId) f('url', p.url, 'literal');
+  if (includeAbstract) f('abstract', p.abstract);
+  const width = Math.max(4, ...fields.map(([name]) => name.length));
+  const lines = fields.map(([name, value], index) =>
+    `  ${name.padEnd(width)} = {${value}}${index < fields.length - 1 ? ',' : ''}`
+  );
+  return [`@${t}{${k},`, ...lines, '}', ''].join('\n');
 }
 
 /* ============================================================
    CROSSREF FETCH
 ============================================================ */
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('通信がタイムアウトしました');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchDOI(raw) {
-  const doi = raw.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i,'');
-  const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`);
+  const doi = normalizeDoi(raw);
+  if (!/^10\.\d{4,9}\/.+/.test(doi)) throw new Error('DOIの形式を確認してください');
+  const res = await fetchWithTimeout(`https://api.crossref.org/works/${encodeURIComponent(doi)}`);
   if (!res.ok) throw new Error('DOIが見つかりません（CrossRef）');
   const { message: m } = await res.json();
   const authors = (m.author||[]).map(a => a.family&&a.given ? `${a.family}, ${a.given}` : a.family||a.name||'').filter(Boolean);
@@ -1898,10 +2165,9 @@ async function fetchDOI(raw) {
    ARXIV FETCH
 ============================================================ */
 async function fetchArxiv(raw) {
-  const id = raw.trim()
-    .replace(/^https?:\/\/arxiv\.org\/(abs|pdf)\//i,'')
-    .replace(/v\d+$/,'');
-  const res = await fetch(`https://export.arxiv.org/api/query?id_list=${id}`);
+  const id = normalizeArxivId(raw);
+  if (!/^(?:\d{4}\.\d{4,5}|[a-z][\w.-]+\/\d{7})$/i.test(id)) throw new Error('arXiv IDの形式を確認してください');
+  const res = await fetchWithTimeout(`https://export.arxiv.org/api/query?id_list=${id}`);
   if (!res.ok) throw new Error('arXivに接続できません');
   const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
   const entry = xml.querySelector('entry');
@@ -1918,8 +2184,8 @@ async function fetchArxiv(raw) {
   const jref = entry.querySelector('journal_ref')?.textContent?.trim()||'';
   return {
     id: uid(), type: 'preprint', bibtexKey: '', title, authors, year,
-    journal: jref||'arXiv', volume:'', number:'', pages:'', publisher:'',
-    doi, arxivId: id, url: `https://arxiv.org/abs/${id}`, abstract: summary,
+    journal: jref||'arXiv', booktitle:'', volume:'', number:'', pages:'', publisher:'', school:'',
+    doi, arxivId: id, archivePrefix:'arXiv', primaryClass:'', url: `https://arxiv.org/abs/${id}`, abstract: summary,
     citationCount: null, tags: [], collections: [], starred: false,
     readStatus: 'unread', notes: '', addedAt: new Date().toISOString(),
     pdfId: '', pdfName: '', pdfOriginalName: '', pdfPath: '', hasPdf: false, supplementalFiles: []
@@ -1935,7 +2201,24 @@ function normalizeDoi(value) {
   return String(value || '').trim()
     .replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '')
     .replace(/^doi:\s*/i, '')
+    .replace(/\s+/g, '')
     .replace(/[.,;:)\]}]+$/, '');
+}
+
+function normalizeArxivId(value) {
+  return String(value || '').trim()
+    .replace(/^arxiv:\s*/i, '')
+    .replace(/^https?:\/\/arxiv\.org\/(?:abs|pdf)\//i, '')
+    .replace(/\.pdf$/i, '')
+    .replace(/v\d+$/i, '')
+    .replace(/\s+/g, '');
+}
+
+function normalizeBibKey(value) {
+  return sanitizeText(value, 120)
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^A-Za-z0-9:_./+\-]/g, '');
 }
 
 function findDoi(text) {
@@ -1968,7 +2251,7 @@ function crossrefPaper(message, fallbackDoi = '') {
 }
 
 async function fetchCrossrefWorkByDoi(doi) {
-  const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(normalizeDoi(doi))}`);
+  const res = await fetchWithTimeout(`https://api.crossref.org/works/${encodeURIComponent(normalizeDoi(doi))}`);
   if (!res.ok) throw new Error('DOIが見つかりません（CrossRef）');
   const { message } = await res.json();
   return crossrefPaper(message, doi);
@@ -1987,7 +2270,7 @@ function titleSimilarity(left, right) {
 async function fetchCrossrefWorkByTitle(title) {
   if (!title) return null;
   const url = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(title)}&rows=5`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url);
   if (!res.ok) return null;
   const items = (await res.json()).message?.items || [];
   let best = null;
@@ -2059,7 +2342,7 @@ function filtered() {
       (p.abstract||'').toLowerCase().includes(q) ||
       (p.tags||[]).join(' ').toLowerCase().includes(q) ||
       (p.notes||'').toLowerCase().includes(q) ||
-      (p.journal||'').toLowerCase().includes(q)
+      [p.journal, p.booktitle, p.publisher, p.school].filter(Boolean).join(' ').toLowerCase().includes(q)
     );
   }
   if (S.filters.author) {
@@ -2069,7 +2352,7 @@ function filtered() {
   if (S.filters.year)    pp = pp.filter(p => String(p.year) === S.filters.year);
   if (S.filters.journal) {
     const j = S.filters.journal.toLowerCase();
-    pp = pp.filter(p => (p.journal||'').toLowerCase().includes(j));
+    pp = pp.filter(p => [p.journal, p.booktitle, p.publisher, p.school].filter(Boolean).join(' ').toLowerCase().includes(j));
   }
 
   pp.sort((a,b) => {
@@ -2099,7 +2382,7 @@ function renderSidebar() {
 
   const item = (view, ico, lbl, cnt) => {
     const a = S.view===view?'active':'';
-    return `<div class="side-item ${a}" data-action="set-view" data-view="${h(view)}">
+    return `<div class="side-item ${a}" role="button" tabindex="0" aria-current="${a ? 'page' : 'false'}" data-action="set-view" data-view="${h(view)}">
       <span class="ico">${ico}</span><span class="lbl">${h(lbl)}</span><span class="cnt">${cnt}</span></div>`;
   };
 
@@ -2141,7 +2424,7 @@ function renderSidebar() {
       ${S.collections.map((c, idx) => {
         const cc = S.papers.filter(p=>(p.collections||[]).includes(c.id)).length;
         const a = S.view==='col:'+c.id?'active':'';
-        return `<div class="side-item ${a}" data-action="set-view" data-view="${h(`col:${c.id}`)}">
+        return `<div class="side-item ${a}" role="button" tabindex="0" aria-current="${a ? 'page' : 'false'}" data-action="set-view" data-view="${h(`col:${c.id}`)}">
           <span class="ico">📁</span><span class="lbl">${h(c.name)}</span>
           <span class="side-actions">
             <button type="button" class="side-act" data-action="move-collection-up" data-id="${h(c.id)}" title="上へ移動" ${idx===0?'disabled':''}>▲</button>
@@ -2157,7 +2440,7 @@ function renderSidebar() {
       <div class="side-sec-hd">タグ</div>
       ${Object.entries(tagCounts).sort((a,b)=>b[1]-a[1]).map(([t,c]) => {
         const a = S.view==='tag:'+t?'active':'';
-        return `<div class="side-item ${a}" data-action="set-view" data-view="${h(`tag:${t}`)}">
+        return `<div class="side-item ${a}" role="button" tabindex="0" aria-current="${a ? 'page' : 'false'}" data-action="set-view" data-view="${h(`tag:${t}`)}">
           <span class="ico" style="color:var(--tag-fg);opacity:1;font-size:10px;">#</span>
           <span class="lbl">${h(t)}</span><span class="cnt">${c}</span></div>`;
       }).join('')}
@@ -2172,6 +2455,8 @@ function renderList() {
   const collectionBibBtn = document.getElementById('collection-bib-btn');
   const collectionDupBtn = document.getElementById('collection-dup-btn');
   const collectionMdBtn = document.getElementById('collection-md-btn');
+  const collectionCiteBtn = document.getElementById('collection-cite-btn');
+  const collectionTools = document.getElementById('collection-tools');
   if (S.view.startsWith('col:')) {
     const c=S.collections.find(c=>c.id===S.view.slice(4));
     title=c?`📁 ${c.name}`:'コレクション';
@@ -2184,9 +2469,10 @@ function renderList() {
       collectionDupBtn.dataset.collectionId = c ? c.id : '';
     }
     if (collectionMdBtn) {
-      collectionMdBtn.style.display = c ? 'flex' : 'none';
       collectionMdBtn.dataset.collectionId = c ? c.id : '';
     }
+    if (collectionCiteBtn) collectionCiteBtn.dataset.collectionId = c ? c.id : '';
+    if (collectionTools) collectionTools.classList.toggle('on', !!c);
   } else {
     if (collectionBibBtn) {
       collectionBibBtn.style.display = 'none';
@@ -2197,9 +2483,10 @@ function renderList() {
       collectionDupBtn.dataset.collectionId = '';
     }
     if (collectionMdBtn) {
-      collectionMdBtn.style.display = 'none';
       collectionMdBtn.dataset.collectionId = '';
     }
+    if (collectionCiteBtn) collectionCiteBtn.dataset.collectionId = '';
+    if (collectionTools) collectionTools.classList.remove('on');
     if (S.view.startsWith('tag:')) title = `# ${S.view.slice(4)}`;
   }
   document.getElementById('list-title').textContent = title;
@@ -2214,6 +2501,7 @@ function renderList() {
 
   const readLbl = { unread:'未読', reading:'読書中', read:'読了' };
   document.getElementById('paper-list').innerHTML = pp.map(p => {
+    const venue = p.journal || p.booktitle || p.publisher || p.school || '';
     const auStr = (p.authors||[]).length
       ? (p.authors||[]).slice(0,3).map(a=>a.split(',')[0].trim()).join(', ') + (p.authors.length>3?' ほか':'')
       : '著者不明';
@@ -2221,13 +2509,13 @@ function renderList() {
     const tags = (p.tags||[]).slice(0,3).map(t=>`<span class="tag-pill">${h(t)}</span>`).join('');
     const cit = p.citationCount!=null ? `<span class="pi-cit">被引用 ${p.citationCount}</span>` : '';
     const sel = S.selectedId===p.id?'sel':'';
-    return `<div class="paper-item ${sel}" data-action="select-paper" data-id="${h(p.id)}">
+    return `<div class="paper-item ${sel}" role="button" tabindex="0" aria-selected="${S.selectedId===p.id}" data-action="select-paper" data-id="${h(p.id)}">
       <div class="pi-top">
-        <button type="button" class="pi-star ${p.starred?'on':''}" data-action="toggle-star" data-id="${h(p.id)}">${p.starred?'★':'☆'}</button>
+        <button type="button" class="pi-star ${p.starred?'on':''}" aria-label="${p.starred?'スターを外す':'スターを付ける'}" data-action="toggle-star" data-id="${h(p.id)}">${p.starred?'★':'☆'}</button>
         <div class="pi-title">${richInline(p.title||'（タイトルなし）')}</div>
         <div class="pi-year">${p.year||'—'}</div>
       </div>
-      <div class="pi-meta">${h(auStr)}${p.journal?` · ${h(p.journal)}`:''}</div>
+      <div class="pi-meta">${h(auStr)}${venue?` · ${h(venue)}`:''}</div>
       <div class="pi-bot"><span class="badge ${rs}">${readLbl[rs]}</span>${tags}${cit}</div>
     </div>`;
   }).join('');
@@ -2243,7 +2531,7 @@ function renderDetail() {
 
   const typeLabels = { article:'Journal Article', inproceedings:'Conference Paper', preprint:'Preprint', book:'Book', misc:'Other', phdthesis:'PhD Thesis', mastersthesis:'Master\'s Thesis' };
   const auStr = (p.authors||[]).join(', ') || '—';
-  const venParts = [p.journal, p.volume?`vol.${p.volume}`:'', p.number?`no.${p.number}`:'', p.pages].filter(Boolean);
+  const venParts = [p.journal || p.booktitle || p.publisher || p.school, p.volume?`vol.${p.volume}`:'', p.number?`no.${p.number}`:'', p.pages].filter(Boolean);
   const ven = venParts.join(' · ');
   const doiUrl = safeDoiUrl(p.doi);
   const arxivUrl = safeArxivUrl(p.arxivId);
@@ -2274,14 +2562,16 @@ function renderDetail() {
 
   const cit = p.citationCount!=null
     ? `<div class="d-cit"><strong>${p.citationCount}</strong> 被引用数</div>` : '';
+  const citationKey = normalizeBibKey(p.bibtexKey || bKey(p));
 
   pane.innerHTML = `<div class="detail-wrap">
-    <button type="button" class="d-star ${p.starred?'on':''}" data-action="toggle-star" data-id="${h(p.id)}">${p.starred?'★':'☆'}</button>
+    <button type="button" class="d-star ${p.starred?'on':''}" aria-label="${p.starred?'スターを外す':'スターを付ける'}" data-action="toggle-star" data-id="${h(p.id)}">${p.starred?'★':'☆'}</button>
     <div class="d-type">${typeLabels[p.type]||p.type||'—'}</div>
     <div class="d-title">${richInline(p.title||'（タイトルなし）')}</div>
     <div class="d-authors">${h(auStr)}</div>
     ${ven?`<div class="d-venue">${h(ven)}</div>`:''}
     ${links?`<div class="d-links">${links}</div>`:''}
+    <button type="button" class="cite-key" data-action="copy-cite" data-id="${h(p.id)}" title="LaTeXの引用コマンドをコピー">\\cite{${h(citationKey)}}</button>
     ${p.hasPdf?`<div class="d-venue">添付PDF: ${h(p.pdfName||'stored.pdf')}${p.pdfPath?` · ${h(p.pdfPath)}`:''}</div>`:''}
     ${(p.supplementalFiles||[]).length?`<div class="d-venue">補足資料: ${(p.supplementalFiles||[]).length}件</div>`:''}
     ${cit}
@@ -2313,7 +2603,7 @@ function renderDetail() {
       <button type="button" class="btn-sec" data-action="prompt-attach-pdf" data-id="${h(p.id)}">${p.hasPdf?'🔁 PDFを差し替え':'📎 PDFを添付'}</button>
       ${p.hasPdf?`<button type="button" class="btn-sec" data-action="open-pdf" data-id="${h(p.id)}">📄 PDFを開く</button><button type="button" class="btn-del" data-action="remove-pdf" data-id="${h(p.id)}">PDFを外す</button>`:''}
     </div>
-    <div class="d-sh" style="margin-top:14px;">Supplemental materials</div>
+    <div class="d-sh" style="margin-top:14px;">補足資料</div>
     ${(p.supplementalFiles||[]).length ? `<div class="d-links">${(p.supplementalFiles||[]).map(f => `<a class="d-link" href="#" data-action="open-supplement" data-id="${h(p.id)}" data-file-id="${h(f.id)}">${h(f.name)}</a>${f.path?`<span class="d-link" style="pointer-events:none;">${h(f.path)}</span>`:''}<a class="d-link" href="#" data-action="remove-supplement" data-id="${h(p.id)}" data-file-id="${h(f.id)}">削除</a>`).join('')}</div>` : `<div class="d-venue">補足資料: なし</div>`}
     <div class="d-actions">
       <button type="button" class="btn-sec" data-action="prompt-attach-supplement" data-id="${h(p.id)}">📎 補足資料を追加</button>
@@ -2333,7 +2623,7 @@ function updateFilters() {
   const set = fn => { const s = new Set(); S.papers.forEach(fn(s)); return s; };
   const authors = new Set(); S.papers.forEach(p=>(p.authors||[]).forEach(a=>authors.add(a.split(',')[0].trim())));
   const years   = new Set(); S.papers.forEach(p=>{ if(p.year) years.add(String(p.year)); });
-  const journals= new Set(); S.papers.forEach(p=>{ if(p.journal) journals.add(p.journal); });
+  const journals= new Set(); S.papers.forEach(p=>{ const venue = p.journal || p.booktitle || p.publisher || p.school; if(venue) journals.add(venue); });
 
   const upd = (id, vals, cur) => {
     document.getElementById(id).innerHTML = `<option value="">${{fa:'著者…',fy:'年…',fj:'誌名…'}[id]}</option>` +
@@ -2606,29 +2896,35 @@ async function openStoredSupplement(paperId, fileId) {
    MODAL
 ============================================================ */
 function openAddModal() {
+  lastModalTrigger = document.activeElement;
   M.editId=null; M.pending=null;
   document.getElementById('modal-hd-title').textContent='文献を追加';
   document.getElementById('modal-save').textContent='追加';
   document.getElementById('modal-tabs').style.display='';
   switchTab('doi');
   document.getElementById('add-modal').classList.add('open');
+  requestAnimationFrame(() => document.getElementById('doi-in')?.focus());
 }
 
 function openEditModal(id) {
   const p=S.papers.find(q=>q.id===id);
   if (!p) return;
+  lastModalTrigger = document.activeElement;
   M.editId=id; M.pending=JSON.parse(JSON.stringify(p));
   document.getElementById('modal-hd-title').textContent='文献を編集';
   document.getElementById('modal-save').textContent='保存';
   document.getElementById('modal-tabs').style.display='none';
   M.tab='manual'; renderModalBody();
   document.getElementById('add-modal').classList.add('open');
+  requestAnimationFrame(() => document.getElementById('m-bibkey')?.focus());
 }
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
   document.getElementById('modal-tabs').style.display='';
   M.pending=null; M.editId=null;
+  if (lastModalTrigger instanceof HTMLElement) lastModalTrigger.focus();
+  lastModalTrigger = null;
 }
 
 function switchTab(t) {
@@ -2648,7 +2944,7 @@ function renderModalBody() {
           <input class="fi" id="doi-in" placeholder="例: 10.1021/jacs.0c00000 または 2301.12345">
           <button class="btn-fetch" type="button" id="fetch-btn" data-action="do-fetch">🔍 取得</button>
         </div>
-        <div class="fs" id="fetch-st"></div>
+        <div class="fs" id="fetch-st" role="status" aria-live="polite"></div>
         <div class="preview" id="fetch-pv"></div>
       </div>`;
   } else if (M.tab==='bibtex') {
@@ -2660,7 +2956,7 @@ function renderModalBody() {
   ..."></textarea>
       </div>
       <button class="btn-fetch" type="button" style="width:100%;justify-content:center;" data-action="parse-bib">解析する</button>
-      <div class="fs" id="bib-st"></div>
+      <div class="fs" id="bib-st" role="status" aria-live="polite"></div>
       <div class="preview" id="bib-pv"></div>`;
   } else if (M.tab==='manual') {
     const p = M.pending || {};
@@ -2670,7 +2966,7 @@ function renderModalBody() {
         <div class="fg">
           <label class="fl">種別</label>
           <select class="fsel" id="m-type">
-            ${[['article','Journal Article'],['inproceedings','Conference Paper'],['preprint','Preprint'],['book','Book'],['misc','Other'],['phdthesis','PhD Thesis']].map(([v,l])=>`<option value="${v}"${p.type===v?' selected':''}>${l}</option>`).join('')}
+            ${[['article','Journal Article'],['inproceedings','Conference Paper'],['preprint','Preprint'],['book','Book'],['misc','Other'],['phdthesis','PhD Thesis'],['mastersthesis','Master\'s Thesis']].map(([v,l])=>`<option value="${v}"${p.type===v?' selected':''}>${l}</option>`).join('')}
           </select>
         </div>
         <div class="fg" style="max-width:90px;">
@@ -2678,10 +2974,11 @@ function renderModalBody() {
           <input class="fi" type="number" id="m-year" value="${p.year||''}" placeholder="2024">
         </div>
       </div>
+      <div class="fg"><label class="fl" for="m-bibkey">Citation key</label><input class="fi" id="m-bibkey" value="${h(p.bibtexKey||'')}" placeholder="例: smith2024surface"></div>
       <div class="fg"><label class="fl">タイトル *</label><input class="fi" id="m-title" value="${h(plainText(p.title||''))}" placeholder="論文タイトル"></div>
       <div class="fg"><label class="fl">著者（セミコロン区切り: Last, First; Last2, First2）</label><input class="fi" id="m-authors" value="${h(auStr)}" placeholder="Yamada, Taro; Suzuki, Hanako"></div>
       <div class="frow">
-        <div class="fg"><label class="fl">ジャーナル / 会議名</label><input class="fi" id="m-journal" value="${h(p.journal||'')}" placeholder="Journal of ..."></div>
+        <div class="fg"><label class="fl">ジャーナル名</label><input class="fi" id="m-journal" value="${h(p.journal||'')}" placeholder="Journal of ..."></div>
         <div class="fg" style="max-width:65px;"><label class="fl">巻</label><input class="fi" id="m-vol" value="${h(p.volume||'')}" placeholder="10"></div>
         <div class="fg" style="max-width:55px;"><label class="fl">号</label><input class="fi" id="m-num" value="${h(p.number||'')}" placeholder="2"></div>
         <div class="fg" style="max-width:85px;"><label class="fl">ページ</label><input class="fi" id="m-pages" value="${h(p.pages||'')}" placeholder="1-10"></div>
@@ -2692,14 +2989,23 @@ function renderModalBody() {
       </div>
       <div class="fg"><label class="fl">URL</label><input class="fi" id="m-url" value="${h(p.url||'')}" placeholder="https://..."></div>
       <div class="fg"><label class="fl">Abstract</label><textarea class="fta" id="m-abs" placeholder="Abstract...">${h(p.abstract||'')}</textarea></div>
+      <details class="form-details" ${(p.booktitle || p.publisher || p.school || p.primaryClass) ? 'open' : ''}>
+        <summary>書誌詳細（必要な場合のみ）</summary>
+        <div class="form-details-body">
+          <div class="fg"><label class="fl">会議録名（booktitle）</label><input class="fi" id="m-booktitle" value="${h(p.booktitle||'')}"></div>
+          <div class="fg"><label class="fl">出版社</label><input class="fi" id="m-publisher" value="${h(p.publisher||'')}"></div>
+          <div class="fg"><label class="fl">大学・機関（school）</label><input class="fi" id="m-school" value="${h(p.school||'')}"></div>
+          <div class="fg"><label class="fl">arXiv分野（primaryClass）</label><input class="fi" id="m-primary-class" value="${h(p.primaryClass||'')}"></div>
+        </div>
+      </details>
     `;
   } else if (M.tab==='pdf') {
     el.innerHTML = `
-      <div class="drop-area" id="pdf-drop" data-action="trigger-pdf-input">
+      <div class="drop-area" id="pdf-drop" role="button" tabindex="0" data-action="trigger-pdf-input">
         <span class="di">📄</span>PDFをドラッグ＆ドロップ<br>またはクリックして選択
         <input type="file" id="pdf-in" accept=".pdf,application/pdf" style="display:none">
       </div>
-      <div class="fs" id="pdf-st"></div>
+      <div class="fs" id="pdf-st" role="status" aria-live="polite"></div>
       <div class="preview" id="pdf-pv"></div>`;
   }
 }
@@ -2710,7 +3016,7 @@ async function doFetch() {
   btn.disabled=true; btn.innerHTML='<span class="spin"></span> 取得中…';
   st.textContent=''; st.className='fs'; pv.classList.remove('on');
   try {
-    const isArxiv = /^\d{4}\.\d+/.test(val) || /^[a-z\-]+\/\d/.test(val) || val.includes('arxiv');
+    const isArxiv = /^\d{4}\.\d+/.test(val) || /^[a-z\-]+\/\d/i.test(val) || /arxiv/i.test(val);
     const paper = normalizePaper(isArxiv ? await fetchArxiv(val) : await fetchDOI(val));
     M.pending = paper;
     st.textContent='✓ 取得成功！'; st.className='fs ok';
@@ -2723,16 +3029,25 @@ async function doFetch() {
 function doParseBib() {
   const txt=document.getElementById('bib-in').value;
   const st=document.getElementById('bib-st'), pv=document.getElementById('bib-pv');
-  const parsed=parseBib(txt);
-  const paper=parsed ? normalizePaper(parsed) : null;
-  if (!paper) { st.textContent='✕ BibTeXの解析に失敗しました'; st.className='fs err'; return; }
-  M.pending=paper; st.textContent='✓ 解析成功！'; st.className='fs ok';
-  pv.classList.add('on');
-  pv.innerHTML=`<strong>${richInline(paper.title||'（タイトルなし）')}</strong>${(paper.authors||[]).slice(0,3).join(', ')} · ${paper.year||'—'}`;
+  try {
+    const papers = parseBibEntries(txt).map(normalizePaper);
+    if (!papers.length) throw new Error('BibTeXエントリが見つかりません');
+    M.pending = papers.length === 1 ? papers[0] : papers;
+    st.textContent=`✓ ${papers.length} 件を解析しました`; st.className='fs ok';
+    pv.classList.add('on');
+    pv.innerHTML = papers.slice(0, 5).map(p => `<strong>${richInline(p.title||'（タイトルなし）')}</strong>${h((p.authors||[]).slice(0,3).join(', '))} · ${p.year||'—'}`).join('') +
+      (papers.length > 5 ? `<small>ほか ${papers.length - 5} 件</small>` : '');
+  } catch (e) {
+    M.pending=null; pv.classList.remove('on');
+    st.textContent=`✕ ${e.message || 'BibTeXの解析に失敗しました'}`; st.className='fs err';
+  }
 }
 
 async function handlePDF(file) {
-  if (!file || file.type !== 'application/pdf') return;
+  if (!file || (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name || ''))) {
+    toast('PDFファイルを選択してください');
+    return;
+  }
   const st=document.getElementById('pdf-st'), pv=document.getElementById('pdf-pv');
   st.textContent='⏳ メタデータ抽出中…'; st.className='fs';
   try {
@@ -2758,16 +3073,20 @@ function readManualForm(existingId) {
     volume: document.getElementById('m-vol').value.trim(),
     number: document.getElementById('m-num').value.trim(),
     pages: document.getElementById('m-pages').value.trim(),
-    publisher: orig.publisher||'',
+    booktitle: document.getElementById('m-booktitle').value.trim(),
+    publisher: document.getElementById('m-publisher').value.trim(),
+    school: document.getElementById('m-school').value.trim(),
     doi: document.getElementById('m-doi').value.trim(),
     arxivId: document.getElementById('m-arxiv').value.trim(),
+    archivePrefix: document.getElementById('m-arxiv').value.trim() ? 'arXiv' : (orig.archivePrefix||''),
+    primaryClass: document.getElementById('m-primary-class').value.trim(),
     url: document.getElementById('m-url').value.trim(),
     abstract: document.getElementById('m-abs').value.trim(),
     citationCount: orig.citationCount??null,
     tags: orig.tags||[], collections: orig.collections||[],
     starred: orig.starred||false, readStatus: orig.readStatus||'unread',
     notes: orig.notes||'', addedAt: orig.addedAt||new Date().toISOString(),
-    bibtexKey: orig.bibtexKey||'',
+    bibtexKey: document.getElementById('m-bibkey').value.trim(),
     pdfId: orig.pdfId||'', pdfName: orig.pdfName||'', hasPdf: orig.hasPdf||false,
     pdfOriginalName: orig.pdfOriginalName||'',
     pdfPath: orig.pdfPath||'',
@@ -2786,7 +3105,40 @@ async function saveModal() {
     }
     paper = M.pending;
   }
-  if (!paper.bibtexKey) paper.bibtexKey = bKey(paper);
+  const incoming = Array.isArray(paper) ? paper : [paper];
+  const usedKeys = new Set();
+  const existingPapers = S.papers.filter(p => p.id !== (M.editId || ''));
+  const usedDois = new Set(existingPapers.map(p => normalizeDoi(p.doi).toLowerCase()).filter(Boolean));
+  const usedArxivIds = new Set(existingPapers.map(p => normalizeArxivId(p.arxivId).toLowerCase()).filter(Boolean));
+  for (const item of incoming) {
+    if (!plainText(item.title || '').trim()) {
+      alert(`Citation key「${item.bibtexKey || '未設定'}」にタイトルがありません。`);
+      return;
+    }
+    const doi = normalizeDoi(item.doi).toLowerCase();
+    const arxivId = normalizeArxivId(item.arxivId).toLowerCase();
+    if (doi && usedDois.has(doi)) { alert(`DOI「${item.doi}」の文献は既に登録されています。`); return; }
+    if (arxivId && usedArxivIds.has(arxivId)) { alert(`arXiv「${item.arxivId}」の文献は既に登録されています。`); return; }
+    if (doi) usedDois.add(doi);
+    if (arxivId) usedArxivIds.add(arxivId);
+    if (!item.bibtexKey) item.bibtexKey = nextAvailableBibKey(bKey(item), usedKeys, M.editId || '');
+    item.bibtexKey = normalizeBibKey(item.bibtexKey);
+    if (!item.bibtexKey) { alert('Citation keyを英数字で入力してください'); return; }
+    const keyLower = item.bibtexKey.toLowerCase();
+    if (usedKeys.has(keyLower) || findDuplicateBibKey(item.bibtexKey, M.editId || '')) {
+      alert(`Citation key「${item.bibtexKey}」は既に使われています。別のキーへ変更してください。`);
+      return;
+    }
+    usedKeys.add(keyLower);
+  }
+  if (incoming.length > 1) {
+    S.papers.unshift(...incoming);
+    S.selectedId = incoming[0].id;
+    save(); closeModal('add-modal'); render();
+    toast(`${incoming.length} 件の文献を追加しました`);
+    return;
+  }
+  paper = incoming[0];
   if (paper._pdfFile) {
     paper.pdfId = paper.pdfId || paper.id;
     try {
@@ -2884,11 +3236,13 @@ function openDuplicateModal(collectionId) {
   const collection = S.collections.find(c => c.id === collectionId);
   if (!collection) return;
   D.collectionId = collectionId;
+  lastModalTrigger = document.activeElement;
   D.groups = findCollectionDuplicates(collectionId);
   const title = document.getElementById('dup-modal-title');
   if (title) title.textContent = `重複チェック — ${collection.name}`;
   renderDuplicateModalBody();
   document.getElementById('dup-modal').classList.add('open');
+  document.querySelector('#dup-modal .modal-box')?.focus();
 }
 
 function renderDuplicateModalBody() {
@@ -2966,16 +3320,19 @@ function removeDuplicateFromCollection(paperId) {
 /* ============================================================
    BIBTEX EXPORT
 ============================================================ */
-function setBibOutput(content, filename='reference.bib') {
+function setBibOutput(content, filename='reference.bib', count=1) {
+  lastModalTrigger = document.activeElement;
   const out = document.getElementById('bib-out');
   out.textContent = content;
   out.dataset.filename = filename;
+  document.getElementById('bib-modal-title').textContent = `BibTeX 出力（${count}件）`;
   document.getElementById('bib-modal').classList.add('open');
+  document.querySelector('#bib-modal .modal-box')?.focus();
 }
 function showBib(id) {
   const p=S.papers.find(q=>q.id===id);
   if (!p) return;
-  setBibOutput(genBib(p), `${sanitizeFilePart(p.bibtexKey || bKey(p) || 'reference')}.bib`);
+  setBibOutput(genBib(p), `${sanitizeFilePart(p.bibtexKey || bKey(p) || 'reference')}.bib`, 1);
 }
 function showCollectionBib(collectionId) {
   const collection = S.collections.find(c => c.id === collectionId);
@@ -2985,7 +3342,38 @@ function showCollectionBib(collectionId) {
     toast('このコレクションに文献がありません');
     return;
   }
-  setBibOutput(papers.map(genBib).join('\n\n'), `${sanitizeFilePart(collection.name || 'collection')}.bib`);
+  const keys = papers.map(p => normalizeBibKey(p.bibtexKey || bKey(p)).toLowerCase());
+  const duplicate = keys.find((key, index) => key && keys.indexOf(key) !== index);
+  if (duplicate) {
+    toast(`Citation key「${duplicate}」が重複しています`);
+    return;
+  }
+  const sorted = [...papers].sort((a, b) =>
+    normalizeBibKey(a.bibtexKey || bKey(a)).localeCompare(normalizeBibKey(b.bibtexKey || bKey(b)))
+  );
+  setBibOutput(sorted.map(genBib).join('\n'), `${sanitizeFilePart(collection.name || 'collection')}.bib`, sorted.length);
+}
+
+function copyCite(id) {
+  const paper = S.papers.find(p => p.id === id);
+  if (!paper) return;
+  const command = `\\cite{${normalizeBibKey(paper.bibtexKey || bKey(paper))}}`;
+  copyTextToClipboard(command, `${command} をコピーしました`);
+}
+
+function copyCollectionCite(collectionId) {
+  const keys = S.papers
+    .filter(p => (p.collections || []).includes(collectionId))
+    .map(p => normalizeBibKey(p.bibtexKey || bKey(p)))
+    .filter(Boolean);
+  if (!keys.length) { toast('このコレクションに文献がありません'); return; }
+  if (new Set(keys.map(key => key.toLowerCase())).size !== keys.length) {
+    toast('Citation keyが重複しているためコピーできません');
+    return;
+  }
+  keys.sort((a, b) => a.localeCompare(b));
+  const command = `\\cite{${keys.join(',')}}`;
+  copyTextToClipboard(command, `${keys.length}件の引用コマンドをコピーしました`);
 }
 
 /* ============================================================
@@ -3097,10 +3485,12 @@ function genCollectionMarkdown(collection, papers) {
 }
 
 function setMarkdownOutput(content, filename) {
+  lastModalTrigger = document.activeElement;
   const out = document.getElementById('markdown-out');
   out.textContent = content;
   out.dataset.filename = filename;
   document.getElementById('markdown-modal').classList.add('open');
+  document.querySelector('#markdown-modal .modal-box')?.focus();
 }
 
 async function showCollectionMarkdown(collectionId) {
@@ -3117,9 +3507,33 @@ async function showCollectionMarkdown(collectionId) {
   await saveMarkdownToStorage(content, filename, { notify: true });
 }
 
+async function copyTextToClipboard(content, successMessage = 'コピーしました') {
+  let fallbackTextarea = null;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(content);
+    } else {
+      fallbackTextarea = document.createElement('textarea');
+      fallbackTextarea.value = content;
+      fallbackTextarea.style.position = 'fixed';
+      fallbackTextarea.style.opacity = '0';
+      document.body.appendChild(fallbackTextarea);
+      fallbackTextarea.select();
+      if (!document.execCommand('copy')) throw new Error('copy command failed');
+    }
+    toast(successMessage);
+    return true;
+  } catch (error) {
+    console.warn('clipboard copy failed', error);
+    toast('コピーできませんでした。出力欄から手動でコピーしてください');
+    return false;
+  } finally {
+    fallbackTextarea?.remove();
+  }
+}
+
 function cpMarkdown() {
-  navigator.clipboard.writeText(document.getElementById('markdown-out').textContent)
-    .then(() => toast('Markdownをコピーしました'));
+  copyTextToClipboard(document.getElementById('markdown-out').textContent, 'Markdownをコピーしました');
 }
 
 async function saveMarkdownToStorage(content, filename, { notify = false } = {}) {
@@ -3155,14 +3569,14 @@ async function dlMarkdown() {
 }
 
 function cpBib() {
-  navigator.clipboard.writeText(document.getElementById('bib-out').textContent)
-    .then(()=>toast('コピーしました'));
+  copyTextToClipboard(document.getElementById('bib-out').textContent, 'BibTeXをコピーしました');
 }
 function dlBib() {
   const out = document.getElementById('bib-out');
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([out.textContent],{type:'text/plain'}));
+  a.href=URL.createObjectURL(new Blob([out.textContent],{type:'application/x-bibtex;charset=utf-8'}));
   a.download=out.dataset.filename || 'reference.bib'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 /* ============================================================
@@ -3238,6 +3652,8 @@ document.addEventListener('click', async (event) => {
         break;
       case 'open-edit-modal': openEditModal(id); break;
       case 'show-bib': showBib(id); break;
+      case 'copy-cite': copyCite(id); break;
+      case 'copy-collection-cite': copyCollectionCite(collectionId || (S.view.startsWith('col:') ? S.view.slice(4) : '')); break;
       case 'show-collection-bib': showCollectionBib(collectionId || (S.view.startsWith('col:') ? S.view.slice(4) : '')); break;
       case 'show-collection-markdown': await showCollectionMarkdown(collectionId || (S.view.startsWith('col:') ? S.view.slice(4) : '')); break;
       case 'show-collection-duplicates': openDuplicateModal(collectionId || (S.view.startsWith('col:') ? S.view.slice(4) : '')); break;
@@ -3279,6 +3695,11 @@ document.addEventListener('change', async (event) => {
 
 document.addEventListener('keydown', async (event) => {
   if (event.key==='Escape') document.querySelectorAll('.modal-ov.open').forEach(m=>closeModal(m.id));
+  if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('[role="button"][data-action]')) {
+    event.preventDefault();
+    event.target.click();
+    return;
+  }
   if (event.target.id === 'doi-in' && event.key === 'Enter') {
     event.preventDefault();
     await doFetch();
