@@ -894,22 +894,22 @@ function normalizePaper(p) {
     id: safeId,
     type: normalizeType(p?.type),
     bibtexKey: normalizeBibKey(p?.bibtexKey),
-    title: sanitizeText(p?.title, 500),
-    authors: sanitizeStringArray(Array.isArray(p?.authors) ? p.authors : [], 40, 160),
+    title: sanitizeText(cleanBibText(p?.title, true, { symbolFix: true }), 500),
+    authors: sanitizeStringArray((Array.isArray(p?.authors) ? p.authors : []).map(a => cleanBibText(a)), 40, 160),
     year: normalizeYear(p?.year),
-    journal: sanitizeText(p?.journal, 240),
-    booktitle: sanitizeText(p?.booktitle, 240),
-    volume: sanitizeText(p?.volume, 40),
-    number: sanitizeText(p?.number, 40),
-    pages: sanitizeText(p?.pages, 60),
-    publisher: sanitizeText(p?.publisher, 240),
-    school: sanitizeText(p?.school, 240),
+    journal: sanitizeText(cleanBibText(p?.journal), 240),
+    booktitle: sanitizeText(cleanBibText(p?.booktitle), 240),
+    volume: sanitizeText(cleanBibText(p?.volume), 40),
+    number: sanitizeText(cleanBibText(p?.number), 40),
+    pages: sanitizeText(cleanBibText(p?.pages), 60),
+    publisher: sanitizeText(cleanBibText(p?.publisher), 240),
+    school: sanitizeText(cleanBibText(p?.school), 240),
     doi: normalizeDoi(p?.doi),
     arxivId: normalizeArxivId(p?.arxivId),
     archivePrefix: sanitizeText(p?.archivePrefix, 40),
     primaryClass: sanitizeText(p?.primaryClass, 80),
     url: sanitizeExternalUrl(p?.url),
-    abstract: sanitizeText(p?.abstract, 12000),
+    abstract: sanitizeText(cleanBibText(p?.abstract, false, { abstract: true, symbolFix: true }), 12000),
     citationCount: normalizeCount(p?.citationCount),
     tags: sanitizeStringArray(Array.isArray(p?.tags) ? p.tags : [], 60, 40),
     collections: sanitizeStringArray(Array.isArray(p?.collections) ? p.collections : [], 10, 120),
@@ -1678,6 +1678,139 @@ function richInline(s) {
   return tpl.innerHTML;
 }
 
+/* ============================================================
+   BIBLIOGRAPHIC TEXT CLEANUP
+   Crossref / PDF / BibTeX / arXiv metadata often carries HTML, JATS,
+   MathML, HTML entities, LaTeX commands, ligatures, odd spaces and
+   font-encoding artefacts. Everything is normalised here, and
+   normalizePaper() applies it to every stored paper (so previously
+   saved libraries are repaired when they are loaded).
+============================================================ */
+const BIB_LIGATURES = { 'ﬀ': 'ff', 'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬃ': 'ffi', 'ﬄ': 'ffl', 'ﬅ': 'st', 'ﬆ': 'st' };
+
+// DOM node -> text. keep=true retains <sub>/<sup>/<i>/<b>; everything else is flattened.
+function bibNodeToText(node, keep) {
+  if (node.nodeType === 3) {
+    const t = node.nodeValue || '';
+    return keep ? t.replace(/&(?=#?[a-z0-9]+;)/gi, '&amp;').replace(/</g, '&lt;') : t;
+  }
+  if (node.nodeType !== 1 && node.nodeType !== 11) return '';
+  const name = String(node.localName || node.nodeName || '').toLowerCase().replace(/^.*:/, '');
+  const kids = Array.from(node.childNodes);
+  const inner = () => kids.map(k => bibNodeToText(k, keep)).join('');
+  const els = () => kids.filter(k => k.nodeType === 1);
+  const sub = (el, tag) => el ? ((s => (keep && s ? `<${tag}>${s}</${tag}>` : s))(bibNodeToText(el, keep).trim())) : '';
+  const mark = (tag, body) => (keep && body.trim()) ? `<${tag}>${body}</${tag}>` : body;
+  switch (name) {
+    case 'script': case 'style': return '';
+    case 'sub': case 'sup': return mark(name, inner().trim());
+    case 'i': case 'em': case 'italic': return mark('i', inner());
+    case 'b': case 'strong': case 'bold': return mark('b', inner());
+    // MathML (Crossref sometimes embeds <mml:math> in titles)
+    case 'msub': { const [a, b] = els(); return (a ? bibNodeToText(a, keep) : '') + sub(b, 'sub'); }
+    case 'msup': { const [a, b] = els(); return (a ? bibNodeToText(a, keep) : '') + sub(b, 'sup'); }
+    case 'msubsup': { const [a, b, c] = els(); return (a ? bibNodeToText(a, keep) : '') + sub(b, 'sub') + sub(c, 'sup'); }
+    case 'mfrac': { const [a, b] = els(); return `${a ? bibNodeToText(a, keep) : ''}/${b ? bibNodeToText(b, keep) : ''}`; }
+    // JATS / block-ish elements -> whitespace
+    case 'title':
+      if (/^\s*abstract\s*$/i.test(node.textContent || '')) return ' ';
+      return ' ' + inner() + ' ';
+    case 'p': case 'div': case 'br': case 'li': case 'sec': return ' ' + inner() + ' ';
+    default: return inner();
+  }
+}
+
+// value -> clean text.
+//   keep   : keep <sub>/<sup>/<i>/<b> (titles); otherwise plain text
+//   opts   : { abstract: strip leading "Abstract", symbolFix: repair Elsevier symbol-font artefacts }
+function cleanBibText(value, keep = false, opts = {}) {
+  let s = String(value ?? '');
+  if (!s) return '';
+  // UTF-16 strings read as bytes ("T\0i\0t\0l\0e") and leaked BOM markers ("þÿ…")
+  s = s.replace(/^(?:þÿ|ÿþ|﻿|￾)/, '');
+  if (s.includes('\u0000')) s = s.replace(/\u0000/g, '');
+  if (/[<&]/.test(s)) {
+    // double-encoded markup (&lt;i&gt;…) -> real markup
+    if (/&lt;\/?(?:sub|sup|i|b|em|strong|scp|math|mml:|jats:)/i.test(s)) s = decodeEntities(s);
+    s = s
+      // no whitespace just inside / before sub & sup
+      .replace(/\s+(?=<(?:jats:)?(?:sub|sup)\b)/gi, '')
+      .replace(/(<(?:jats:)?(?:sub|sup)>)\s+/gi, '$1')
+      .replace(/\s+(?=<\/(?:jats:)?(?:sub|sup)>)/gi, '')
+      // publishers often forget the space around inline markup
+      .replace(/([A-Za-z0-9])(?=<(?:\w+:)?math\b)/g, '$1 ')
+      .replace(/(<\/(?:\w+:)?math>)(?=[A-Za-z0-9(])/g, '$1 ')
+      .replace(/([A-Za-z0-9])(<(i|em|jats:italic)>[^<]{3,}<\/\3>)/gi, '$1 $2')
+      .replace(/(<(i|em|jats:italic)>[^<]{3,}<\/\2>)(?=[A-Za-z0-9])/gi, '$1 ')
+      .replace(/(<\/(?:jats:)?(?:sub|sup)>)(?=[a-z]{2,}|[A-Z][a-z]{2,})/g, '$1 ');
+    const tpl = document.createElement('template');
+    tpl.innerHTML = s;
+    s = bibNodeToText(tpl.content, keep);
+  }
+  s = s
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/[  -   　]/g, ' ')
+    .replace(/[​-‍⁠﻿­]/g, '')
+    .replace(/[‐‑]/g, '-')
+    .replace(/[ﬀ-ﬆ]/g, ch => BIB_LIGATURES[ch] || ch);
+  if (opts.symbolFix) s = s.replace(/(?<=[0-9A-Za-z)\]])þ(?![a-z])/g, '+').replace(/\/C0/g, '−');
+  s = s.replace(/\s+/g, ' ').trim();
+  if (keep) s = s.replace(/<(sub|sup|i|b)>\s*<\/\1>/g, '');
+  if (opts.abstract) s = s.replace(/^Abstract(?=[A-Z0-9(‘“"])/, '');
+  return s;
+}
+
+/* ---- LaTeX -> text (BibTeX import, arXiv) ---- */
+const TEX_ACCENT = { '"': '̈', "'": '́', '`': '̀', '^': '̂', '~': '̃', '=': '̄', '.': '̇', c: '̧', v: '̌', u: '̆', H: '̋', k: '̨', r: '̊' };
+const TEX_LETTERS = { ss: 'ß', aa: 'å', AA: 'Å', ae: 'æ', AE: 'Æ', oe: 'œ', OE: 'Œ', o: 'ø', O: 'Ø', l: 'ł', L: 'Ł', i: 'ı', j: 'ȷ' };
+const TEX_GREEK = { alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', varepsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', vartheta: 'ϑ', iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', upsilon: 'υ', phi: 'φ', varphi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω', Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ', Pi: 'Π', Sigma: 'Σ', Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω' };
+const TEX_SYMBOLS = { times: '×', pm: '±', approx: '≈', sim: '∼', leq: '≤', le: '≤', geq: '≥', ge: '≥', neq: '≠', to: '→', rightarrow: '→', leftarrow: '←', leftrightarrow: '↔', rightleftharpoons: '⇌', circ: '°', cdot: '·', infty: '∞', AA: 'Å' };
+
+function texMathToInline(math, keep) {
+  let t = String(math);
+  for (let i = 0; i < 4; i++) {
+    t = t.replace(/\\(?:mathrm|mathit|mathbf|mathsf|mathcal|text|textrm|textit|rm|it|bf)\s*\{([^{}]*)\}/g, '$1');
+  }
+  t = t.replace(/\\([A-Za-z]+)\s*/g, (_, n) => TEX_GREEK[n] ?? TEX_SYMBOLS[n] ?? '');
+  const wrap = (tag, body) => keep ? `<${tag}>${body}</${tag}>` : body;
+  t = t.replace(/_\s*\{([^{}]*)\}|_\s*([A-Za-z0-9+\-])/g, (_, a, b) => wrap('sub', a ?? b));
+  t = t.replace(/\^\s*\{([^{}]*)\}|\^\s*([A-Za-z0-9+\-])/g, (_, a, b) => wrap('sup', a ?? b));
+  return t.replace(/[{}]/g, '');
+}
+
+function texToText(value, keep = false, opts = {}) {
+  let s = String(value ?? '');
+  if (!/[\\${}~]|--|``|''/.test(s)) return cleanBibText(s, keep, opts);
+  s = s.replace(/\\\$/g, '\u0001');
+  s = s.replace(/\$([^$]*)\$/g, (_, m) => texMathToInline(m, keep));
+  s = s
+    .replace(/\\(["'`^~=.])\s*(?:\{\s*(\\?[A-Za-z])\s*\}|(\\?[A-Za-z]))/g,
+      (_, acc, a, b) => (String(a || b).replace('\\', '') + TEX_ACCENT[acc]).normalize('NFC'))
+    .replace(/\\([cvuHkr])(?:\s*\{\s*([A-Za-z])\s*\}|\s+([A-Za-z]))/g,
+      (_, acc, a, b) => ((a || b) + TEX_ACCENT[acc]).normalize('NFC'))
+    .replace(/\\(ss|aa|AA|ae|AE|oe|OE|o|O|l|L|i|j)(?![A-Za-z])(?:\{\}|\s)?/g, (_, n) => TEX_LETTERS[n]);
+  const tagWrap = tag => (_, body) => keep ? `<${tag}>${body}</${tag}>` : body;
+  for (let i = 0; i < 3; i++) s = s.replace(/(^|[^\\A-Za-z*])\{([^{}\\]*)\}/g, '$1$2');   // protective braces {YSZ}
+  for (let i = 0; i < 4; i++) {
+    s = s
+      .replace(/\\(?:textit|emph|textsl)\s*\{([^{}]*)\}/g, tagWrap('i'))
+      .replace(/\\textbf\s*\{([^{}]*)\}/g, tagWrap('b'))
+      .replace(/\\textsubscript\s*\{([^{}]*)\}/g, tagWrap('sub'))
+      .replace(/\\textsuperscript\s*\{([^{}]*)\}/g, tagWrap('sup'))
+      .replace(/\\(?:textrm|textsc|textsf|texttt|textnormal|textup|mbox|text|mathrm|ensuremath|url)\s*\{([^{}]*)\}/g, '$1');
+  }
+  s = s
+    .replace(/\\([&%_#])/g, '$1')
+    .replace(/\u0001/g, '$')
+    .replace(/---/g, '—').replace(/--/g, '–')
+    .replace(/``/g, '“').replace(/''/g, '”')
+    .replace(/\\[,;:! ]/g, ' ').replace(/\\-/g, '')
+    .replace(/\\[A-Za-z]+\*?\s*/g, '')
+    .replace(/[{}]/g, '');
+  if (opts.tilde !== false) s = s.replace(/~/g, ' ');
+  return cleanBibText(s, keep, opts);
+}
+
 // For use in data attributes — escape single quotes
 function oa(s) { return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 
@@ -1869,14 +2002,18 @@ function initListPaneResize() {
 ============================================================ */
 function bKey(p) {
   const skip = /^(the|and|for|with|from|into|over|upon|this|that|a|an|in|on|of|to|at|by|is)$/i;
-  const fa = (p.authors && p.authors[0])
-    ? p.authors[0].split(',')[0].trim().replace(/\s/g,'').toLowerCase().slice(0,10)
-    : 'unknown';
+  const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  let fa = 'unknown';
+  const a0 = p.authors && p.authors[0] ? plainText(p.authors[0]) : '';
+  if (a0) {
+    const surname = a0.includes(',') ? a0.split(',')[0] : a0.trim().split(/\s+/).pop();
+    fa = fold(surname).slice(0, 10) || 'unknown';
+  }
   const yr = p.year || 'xxxx';
   const titleText = plainText(p.title || '');
   const tw = titleText.split(/\s+/)
     .find(w => w.length > 3 && !skip.test(w)) || titleText.split(/\s+/)[0] || 'paper';
-  return normalizeBibKey(fa + yr + tw.replace(/[^a-zA-Z0-9]/g,'').toLowerCase().slice(0,8)) || `ref${yr}`;
+  return normalizeBibKey(fa + yr + (fold(tw).slice(0, 8) || 'paper')) || `ref${yr}`;
 }
 
 function findDuplicateBibKey(key, excludeId = '') {
@@ -1951,12 +2088,59 @@ function findTopLevelComma(text) {
   return -1;
 }
 
+// Return the index just after the brace that closes the one at start.
+function bibSkipBraces(str, start) {
+  let depth = 0;
+  for (let i = start; i < str.length; i++) {
+    const c = str[i];
+    if (c === '\\') { i++; continue; }
+    if (c === '{') depth++;
+    else if (c === '}') { depth--; if (depth === 0) return i + 1; }
+  }
+  return str.length;
+}
+
+// Read a field value in braces, quotes or bare text, including # concatenation.
+function bibReadValue(str, pos) {
+  let value = '';
+  let i = pos;
+  while (i < str.length) {
+    while (/\s/.test(str[i] || '')) i++;
+    const c = str[i];
+    if (c === '{') {
+      const end = bibSkipBraces(str, i);
+      value += str.slice(i + 1, str[end - 1] === '}' ? end - 1 : end);
+      i = end;
+    } else if (c === '"') {
+      let j = i + 1, depth = 0;
+      for (; j < str.length; j++) {
+        const d = str[j];
+        if (d === '\\') { j++; continue; }
+        if (d === '{') depth++;
+        else if (d === '}') depth--;
+        else if (d === '"' && depth === 0) break;
+      }
+      value += str.slice(i + 1, j);
+      i = j + 1;
+    } else {
+      const m = /^[^,{}"#\s]+/.exec(str.slice(i));
+      if (!m) break;
+      value += m[0];
+      i += m[0].length;
+    }
+    while (/\s/.test(str[i] || '')) i++;
+    if (str[i] === '#') { i++; continue; }
+    break;
+  }
+  return { value, next: i };
+}
+
 function parseBibFields(text) {
   const fields = {};
   let i = 0;
   while (i < text.length) {
     while (i < text.length && /[\s,]/.test(text[i])) i++;
-    const nameMatch = /^[A-Za-z][\w-]*/.exec(text.slice(i));
+    const nameMatch = /^[A-Za-z][\w:-]*/.exec(text.slice(i));
     if (!nameMatch) { i++; continue; }
     const name = nameMatch[0].toLowerCase();
     i += nameMatch[0].length;
@@ -1964,38 +2148,9 @@ function parseBibFields(text) {
     if (text[i] !== '=') { while (i < text.length && text[i] !== ',') i++; continue; }
     i++;
     while (/\s/.test(text[i] || '')) i++;
-    let value = '';
-    if (text[i] === '{') {
-      let depth = 1, escaped = false;
-      const start = ++i;
-      for (; i < text.length; i++) {
-        const ch = text[i];
-        if (escaped) { escaped = false; continue; }
-        if (ch === '\\') { escaped = true; continue; }
-        if (ch === '{') depth++;
-        else if (ch === '}' && --depth === 0) break;
-      }
-      if (depth !== 0) throw new Error(`${name} フィールドの括弧が閉じていません`);
-      value = text.slice(start, i++);
-    } else if (text[i] === '"') {
-      const start = ++i;
-      let escaped = false;
-      for (; i < text.length; i++) {
-        if (escaped) { escaped = false; continue; }
-        if (text[i] === '\\') { escaped = true; continue; }
-        if (text[i] === '"') break;
-      }
-      value = text.slice(start, i++);
-    } else {
-      const start = i;
-      while (i < text.length && text[i] !== ',') i++;
-      value = text.slice(start, i);
-    }
-    while (/\s/.test(text[i] || '')) i++;
-    if (text[i] === '#' || /(^|[^\\])#/.test(value)) {
-      throw new Error(`${name} フィールドの # による値連結には対応していません`);
-    }
-    fields[name] = value.trim();
+    const parsed = bibReadValue(text, i);
+    fields[name] = parsed.value.trim();
+    i = Math.max(parsed.next, i + 1);
   }
   return fields;
 }
@@ -2019,30 +2174,40 @@ function splitBibAuthors(value) {
 }
 
 function parseBibEntry(txt) {
-  const match = /^\s*@([A-Za-z]+)\s*([\{(])([\s\S]*)[\})]\s*$/.exec(txt);
-  if (!match) throw new Error('BibTeXエントリを解析できません');
+  const source = String(txt || '').trim();
+  const match = /^@([A-Za-z]+)\s*([\{(])/.exec(source);
+  if (!match || !/[})]$/.test(source)) throw new Error('BibTeXエントリを解析できません');
   const sourceType = match[1].toLowerCase();
-  const body = match[3];
+  const body = source.slice(match[0].length, -1);
   const comma = findTopLevelComma(body);
   if (comma < 0) throw new Error('Citation keyの後にカンマがありません');
   const bk = normalizeBibKey(body.slice(0, comma));
   const fields = parseBibFields(body.slice(comma + 1));
-  const authors = splitBibAuthors(fields.author);
+  const T = (value, keep = false, opts = {}) => texToText(value, keep, { ...opts, symbolFix: true });
+  const unTex = value => String(value || '').replace(/\\([_%&#$])/g, '$1').trim();
+  const authors = splitBibAuthors(fields.author).map(author => T(author)).filter(Boolean);
   const typeMap = {
     article:'article', inproceedings:'inproceedings', conference:'inproceedings',
     incollection:'inproceedings', book:'book', booklet:'book', preprint:'preprint',
     misc:'misc', online:'misc', techreport:'misc', phdthesis:'phdthesis', mastersthesis:'mastersthesis'
   };
   const type = typeMap[sourceType] || 'misc';
+  const yearMatch = String(fields.year || fields.date || '').match(/\d{4}/);
+  const prefix = T(fields.archiveprefix || fields.eprinttype || '');
+  const eprint = fields.eprint && (!prefix || prefix.toLowerCase() === 'arxiv') ? normalizeArxivId(unTex(fields.eprint)) : '';
   return {
-    id: uid(), type: type, bibtexKey: bk,
-    title: fields.title||'', authors,
-    year: parseInt(fields.year)||null,
-    journal: fields.journal||'', booktitle: fields.booktitle||'',
-    volume: fields.volume||'', number: fields.number||'', pages: fields.pages||'',
-    publisher: fields.publisher||'', school: fields.school||fields.institution||'', doi: fields.doi||'',
-    arxivId: fields.eprint||'', archivePrefix: fields.archiveprefix||'', primaryClass: fields.primaryclass||'', url: fields.url||'',
-    abstract: fields.abstract||'', citationCount: null,
+    id: uid(), type, bibtexKey: bk,
+    title: T(fields.title, true), authors,
+    year: yearMatch ? parseInt(yearMatch[0], 10) : null,
+    journal: T(fields.journal || fields.journaltitle || ''),
+    booktitle: T(fields.booktitle || ''),
+    volume: T(fields.volume), number: T(fields.number),
+    pages: T(fields.pages).replace(/\s*[-–—]+\s*/g, '-'),
+    publisher: T(fields.publisher), school: T(fields.school || fields.institution),
+    doi: normalizeDoi(unTex(fields.doi)),
+    arxivId: eprint, archivePrefix: prefix || (eprint ? 'arXiv' : ''),
+    primaryClass: T(fields.primaryclass || ''), url: unTex(fields.url),
+    abstract: T(fields.abstract, false, { abstract: true }), citationCount: null,
     tags: [], collections: [], starred: false, readStatus: 'unread', notes: '',
     addedAt: new Date().toISOString(),
     pdfId: '', pdfName: '', pdfOriginalName: '', pdfPath: '', hasPdf: false, supplementalFiles: []
@@ -2059,52 +2224,73 @@ function parseBib(txt) {
 
 /* ============================================================
    BIBTEX GENERATOR
+   Stored text may contain <sub>/<sup>/<i>, Unicode dashes, accents,
+   & % _ # ... -> convert to valid LaTeX so exported .bib files compile.
 ============================================================ */
-function escapeBibText(value) {
-  const text = plainText(value == null ? '' : value).replace(/\s+/g, ' ').trim();
-  let out = '';
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if ('%&#_'.includes(ch) && text[i - 1] !== '\\') out += '\\';
-    out += ch;
+const TEX_ACCENT_INV = { '̈': '"', '́': "'", '̀': '`', '̂': '^', '̃': '~', '̄': '=', '̇': '.', '̧': 'c', '̨': 'k', '̌': 'v', '̆': 'u', '̋': 'H', '̊': 'r' };
+const TEX_CHAR_MAP = { 'ß': '{\\ss}', 'ø': '{\\o}', 'Ø': '{\\O}', 'ł': '{\\l}', 'Ł': '{\\L}', 'æ': '{\\ae}', 'Æ': '{\\AE}', 'œ': '{\\oe}', 'Œ': '{\\OE}', 'ı': '{\\i}', '–': '--', '—': '---', '‘': '`', '’': "'", '“': '``', '”': "''", ' ': '~', '…': '\\ldots{}' };
+const TEX_MATH_MAP = { '×': '\\times ', '±': '\\pm ', '°': '^{\\circ}', '−': '-', '·': '\\cdot ', '≈': '\\approx ', '∼': '\\sim ', '≤': '\\leq ', '≥': '\\geq ', '≠': '\\neq ', '→': '\\rightarrow ', '←': '\\leftarrow ', '↔': '\\leftrightarrow ', '⇌': '\\rightleftharpoons ', '∞': '\\infty ', 'µ': '\\mu ' };
+for (const [name, ch] of Object.entries(TEX_GREEK)) if (!/^var/.test(name)) TEX_MATH_MAP[ch] = `\\${name} `;
+
+function texEscapeText(text, inMath, accents) {
+  let s = String(text).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const esc = { '\\': '\\textbackslash{}', '{': '\\{', '}': '\\}', '&': '\\&', '%': '\\%', '#': '\\#', '_': '\\_', '$': '\\$', '^': '\\^{}', '~': '\\textasciitilde{}', '<': inMath ? '<' : '$<$', '>': inMath ? '>' : '$>$' };
+  s = s.replace(/[\\{}&%#_$^~<>]/g, ch => esc[ch]);
+  if (accents && !inMath) {
+    s = s.normalize('NFD').replace(/([A-Za-z])([̀-̨̊-̌])/g, (all, base, mark) => {
+      const acc = TEX_ACCENT_INV[mark];
+      if (!acc) return all;
+      if (/[A-Za-z]/.test(acc)) return `{\\${acc} ${base}}`;
+      return `{\\${acc}${base === 'i' || base === 'j' ? '\\' + base : base}}`;
+    }).normalize('NFC');
   }
-  return out;
+  return s.replace(/[^\x00-\x7f]/g, ch => {
+    if (inMath) return TEX_MATH_MAP[ch] ?? ch;
+    if (TEX_CHAR_MAP[ch]) return TEX_CHAR_MAP[ch];
+    if (TEX_MATH_MAP[ch]) return `$${TEX_MATH_MAP[ch].trim()}$`;
+    return ch;
+  });
 }
 
-function hasOuterBibBraces(value) {
-  const text = String(value || '').trim();
-  if (!text.startsWith('{') || !text.endsWith('}')) return false;
-  let depth = 0, escaped = false;
-  for (let i = 0; i < text.length; i++) {
-    if (escaped) { escaped = false; continue; }
-    if (text[i] === '\\') { escaped = true; continue; }
-    if (text[i] === '{') depth++;
-    else if (text[i] === '}' && --depth === 0 && i < text.length - 1) return false;
+function bibToTex(value, opts = {}) {
+  const src = cleanBibText(value, true);
+  if (!src) return '';
+  const accents = opts.accents !== false;
+  let out = '', math = false;
+  for (const part of src.split(/(<\/?(?:sub|sup|i|b)>)/)) {
+    const tag = part.match(/^<(\/?)(sub|sup|i|b)>$/);
+    if (!tag) { out += texEscapeText(part, math, accents); continue; }
+    const closing = !!tag[1], name = tag[2];
+    if (name === 'sub' || name === 'sup') {
+      out += closing ? '}$' : (name === 'sub' ? '$_{' : '$^{');
+      math = !closing;
+    } else {
+      out += closing ? '}' : (name === 'i' ? '\\textit{' : '\\textbf{');
+    }
   }
-  return depth === 0;
+  return out;
 }
 
 function genBib(p, options = {}) {
   const includeAbstract = options.includeAbstract === true;
   const tMap = { article:'article', inproceedings:'inproceedings', book:'book', preprint:'misc', misc:'misc', phdthesis:'phdthesis', mastersthesis:'mastersthesis' };
-  const t = tMap[p.type]||'misc';
+  const t = tMap[p.type] || 'misc';
   const k = normalizeBibKey(options.key || p.bibtexKey || bKey(p)) || 'reference';
   const fields = [];
   const f = (name, value, mode = 'text') => {
     if (value == null || value === '') return;
-    const escaped = mode === 'literal' ? String(value).trim() : escapeBibText(value);
-    fields.push([name, escaped]);
+    const converted = mode === 'literal' ? bibToTex(String(value), { accents: false }) : bibToTex(value);
+    fields.push([name, converted]);
   };
   if (p.authors?.length) f('author', p.authors.join(' and '));
-  if (p.title) {
-    const title = escapeBibText(p.title);
-    fields.push(['title', hasOuterBibBraces(title) ? title : `{${title}}`]);
-  }
+  if (p.title) fields.push(['title', `{${bibToTex(p.title)}}`]);
   if (p.type === 'article') f('journal', p.journal);
   if (p.type === 'inproceedings') f('booktitle', p.booktitle || p.journal);
   f('year', p.year, 'literal');
   if (['article', 'inproceedings'].includes(p.type)) {
-    f('volume', p.volume); f('number', p.number); f('pages', p.pages);
+    f('volume', p.volume); f('number', p.number);
+    const pages = bibToTex(p.pages || '').replace(/(?<=\w)-(?=\w)/g, '--');
+    if (pages) fields.push(['pages', pages]);
   }
   if (p.publisher) f('publisher', p.publisher);
   if (['phdthesis', 'mastersthesis'].includes(p.type)) f('school', p.school || p.publisher);
@@ -2143,21 +2329,12 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
 async function fetchDOI(raw) {
   const doi = normalizeDoi(raw);
   if (!/^10\.\d{4,9}\/.+/.test(doi)) throw new Error('DOIの形式を確認してください');
-  const res = await fetchWithTimeout(`https://api.crossref.org/works/${encodeURIComponent(doi)}`);
-  if (!res.ok) throw new Error('DOIが見つかりません（CrossRef）');
-  const { message: m } = await res.json();
-  const authors = (m.author||[]).map(a => a.family&&a.given ? `${a.family}, ${a.given}` : a.family||a.name||'').filter(Boolean);
-  const dp = m['published-print']?.['date-parts']?.[0] || m['published-online']?.['date-parts']?.[0] || m['published']?.['date-parts']?.[0];
+  const w = await fetchCrossrefWorkByDoi(doi);
   return {
-    id: uid(), type: m.type==='proceedings-article'?'inproceedings':'article', bibtexKey: '',
-    title: (m.title||[''])[0], authors, year: dp?dp[0]:null,
-    journal: (m['container-title']||[])[0]||m.publisher||'',
-    volume: m.volume||'', number: m.issue||'', pages: m.page||'',
-    publisher: m.publisher||'', doi: m.DOI||doi, arxivId: '', url: m.URL||'',
-    abstract: m.abstract ? m.abstract.replace(/<[^>]+>/g,'') : '',
-    citationCount: m['is-referenced-by-count']??null,
+    id: uid(), bibtexKey: '', arxivId: '',
     tags: [], collections: [], starred: false, readStatus: 'unread', notes: '',
-    addedAt: new Date().toISOString()
+    addedAt: new Date().toISOString(),
+    ...w
   };
 }
 
@@ -2172,8 +2349,8 @@ async function fetchArxiv(raw) {
   const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
   const entry = xml.querySelector('entry');
   if (!entry) throw new Error('arXiv IDが見つかりません');
-  const title = entry.querySelector('title')?.textContent?.trim().replace(/\s+/g,' ')||'';
-  const summary = entry.querySelector('summary')?.textContent?.trim().replace(/\s+/g,' ')||'';
+  const title = texToText(entry.querySelector('title')?.textContent?.trim().replace(/\s+/g,' ')||'', true, { tilde: false });
+  const summary = texToText(entry.querySelector('summary')?.textContent?.trim().replace(/\s+/g,' ')||'', false, { tilde: false });
   const published = entry.querySelector('published')?.textContent||'';
   const year = published ? parseInt(published.slice(0,4)) : null;
   const authors = Array.from(entry.querySelectorAll('author name')).map(n => {
@@ -2227,7 +2404,7 @@ function findDoi(text) {
 }
 
 function crossrefDate(message) {
-  for (const key of ['published-print', 'published-online', 'published', 'issued']) {
+  for (const key of ['published-print', 'published-online', 'published', 'issued', 'approved']) {
     const parts = message?.[key]?.['date-parts']?.[0];
     if (parts?.[0]) return parts[0];
   }
@@ -2240,12 +2417,13 @@ function crossrefPaper(message, fallbackDoi = '') {
     a.family && a.given ? `${a.family}, ${a.given}` : a.family || a.name || ''
   ).filter(Boolean);
   return {
+    type: message?.type === 'proceedings-article' ? 'inproceedings' : 'article',
     title: (message?.title || [''])[0] || '', authors, year: crossrefDate(message),
     journal: (message?.['container-title'] || [])[0] || message?.publisher || '',
     volume: message?.volume || '', number: message?.issue || '', pages: message?.page || '',
     publisher: message?.publisher || '', doi,
     url: doi ? `https://doi.org/${encodeURIComponent(doi).replace(/%2F/g, '/')}` : (message?.URL || ''),
-    abstract: message?.abstract ? message.abstract.replace(/<[^>]+>/g, '') : '',
+    abstract: message?.abstract || '',
     citationCount: message?.['is-referenced-by-count'] ?? null
   };
 }
@@ -2258,7 +2436,7 @@ async function fetchCrossrefWorkByDoi(doi) {
 }
 
 function titleSimilarity(left, right) {
-  const words = value => new Set(String(value || '').toLowerCase()
+  const words = value => new Set(cleanBibText(value).toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ').split(/\s+/).filter(w => w.length > 2));
   const a = words(left), b = words(right);
   if (!a.size || !b.size) return 0;
@@ -2282,6 +2460,13 @@ async function fetchCrossrefWorkByTitle(title) {
   return best && best.similarity >= 0.6 ? best.candidate : null;
 }
 
+function cleanPdfTitle(raw) {
+  const s = cleanBibText(raw, true);
+  // generic / filename-like metadata titles are not real titles
+  if (!s || /^(untitled|microsoft word\b.*|.*\.(docx?|pdf|tex|indd|qxd|dvi|ps)|[\w.\-]{20,})$/i.test(s)) return '';
+  return s;
+}
+
 function bestPdfTitle(items) {
   const candidates = (items || []).map(item => ({
     text: String(item.str || '').trim(), size: Math.abs(item.transform?.[0] || 0), y: item.transform?.[5] || 0
@@ -2296,7 +2481,7 @@ async function extractPDF(file) {
   const pdf = await pdfJs.getDocument({ data: buf }).promise;
   const meta = await pdf.getMetadata();
   const infoValues = Object.values(meta.info || {}).join(' ');
-  let title = meta.info?.Title || '';
+  let title = cleanPdfTitle(meta.info?.Title);
   let author = meta.info?.Author || '';
   let firstPageItems = [];
   let extractedText = infoValues;
@@ -2531,7 +2716,9 @@ function renderDetail() {
 
   const typeLabels = { article:'Journal Article', inproceedings:'Conference Paper', preprint:'Preprint', book:'Book', misc:'Other', phdthesis:'PhD Thesis', mastersthesis:'Master\'s Thesis' };
   const auStr = (p.authors||[]).join(', ') || '—';
-  const venParts = [p.journal || p.booktitle || p.publisher || p.school, p.volume?`vol.${p.volume}`:'', p.number?`no.${p.number}`:'', p.pages].filter(Boolean);
+  const venue = p.journal || p.booktitle || p.publisher || p.school;
+  const venHead = [venue, p.year ? `(${p.year})` : '（年不明）'].filter(Boolean).join(' ');
+  const venParts = [venHead, p.volume?`vol.${p.volume}`:'', p.number?`no.${p.number}`:'', p.pages].filter(Boolean);
   const ven = venParts.join(' · ');
   const doiUrl = safeDoiUrl(p.doi);
   const arxivUrl = safeArxivUrl(p.arxivId);
@@ -2604,7 +2791,7 @@ function renderDetail() {
       ${p.hasPdf?`<button type="button" class="btn-sec" data-action="open-pdf" data-id="${h(p.id)}">📄 PDFを開く</button><button type="button" class="btn-del" data-action="remove-pdf" data-id="${h(p.id)}">PDFを外す</button>`:''}
     </div>
     <div class="d-sh" style="margin-top:14px;">補足資料</div>
-    ${(p.supplementalFiles||[]).length ? `<div class="d-links">${(p.supplementalFiles||[]).map(f => `<a class="d-link" href="#" data-action="open-supplement" data-id="${h(p.id)}" data-file-id="${h(f.id)}">${h(f.name)}</a>${f.path?`<span class="d-link" style="pointer-events:none;">${h(f.path)}</span>`:''}<a class="d-link" href="#" data-action="remove-supplement" data-id="${h(p.id)}" data-file-id="${h(f.id)}">削除</a>`).join('')}</div>` : `<div class="d-venue">補足資料: なし</div>`}
+    ${(p.supplementalFiles||[]).length ? `<div class="d-links">${(p.supplementalFiles||[]).map(f => `<a class="d-link" href="#" data-action="open-supplement" data-id="${h(p.id)}" data-file-id="${h(f.id)}"${f.path ? ` title="${h(f.path)}"` : ''}>${h(f.name || f.originalName || '補足資料')}</a>${f.path?`<span class="d-link" style="pointer-events:none;">${h(f.path)}</span>`:''}<a class="d-link" href="#" data-action="remove-supplement" data-id="${h(p.id)}" data-file-id="${h(f.id)}">削除</a>`).join('')}</div>` : `<div class="d-venue">補足資料: なし</div>`}
     <div class="d-actions">
       <button type="button" class="btn-sec" data-action="prompt-attach-supplement" data-id="${h(p.id)}">📎 補足資料を追加</button>
     </div>
@@ -3066,7 +3253,10 @@ function readManualForm(existingId) {
   return normalizePaper({
     id: existingId || uid(),
     type: document.getElementById('m-type').value,
-    title: document.getElementById('m-title').value.trim(),
+    title: (() => {
+      const typed = document.getElementById('m-title').value.trim();
+      return (orig && orig.title && plainText(typed) === plainText(orig.title)) ? orig.title : typed;
+    })(),
     authors: document.getElementById('m-authors').value.split(';').map(a=>a.trim()).filter(Boolean),
     year: parseInt(document.getElementById('m-year').value)||null,
     journal: document.getElementById('m-journal').value.trim(),
