@@ -648,7 +648,7 @@
       </div>
       <div class="list-tools" id="collection-tools" aria-label="コレクション操作" data-i18n-aria-label="コレクション操作">
         <button class="btn-sec" id="collection-bib-btn" type="button" data-action="show-collection-bib">{ } BibTeX</button>
-        <button class="btn-sec" id="collection-cite-btn" type="button" data-action="copy-collection-cite" data-i18n="\\cite をコピー">\\cite をコピー</button>
+        <button class="btn-sec" id="collection-cite-btn" type="button" data-action="copy-collection-cite" data-i18n="\cite をコピー">\cite をコピー</button>
         <button class="btn-sec" id="collection-dup-btn" type="button" data-action="show-collection-duplicates" data-i18n="重複チェック">重複チェック</button>
         <button class="btn-sec" id="collection-md-btn" type="button" data-action="show-collection-markdown" data-i18n="AI用 Markdown">AI用 Markdown</button>
       </div>
@@ -793,7 +793,7 @@ const I18N_EN = {
   "設定の削除に失敗しました": "Failed to delete the setting",
   "保存先フォルダへのアクセス権限がありません": "No permission to access the storage folder",
   "未同期のブラウザ内変更があるため、保存先の自動読み込みを停止しました": "Automatic loading from the storage folder was stopped because this browser has unsynced changes",
-  "リアルタイム同期をOFFにしました。以後は「保存先から読み込む」または「今すぐ同期」を押すまで同期しません": "Real-time sync is now OFF. Nothing will sync until you press “Load from storage” or “Sync now”",
+  "リアルタイム同期をOFFにしました。以後は「保存先から読み込む」または「保存先へ書き出し」を押すまで同期しません": "Real-time sync is now OFF. Nothing will sync until you press “Load from storage” or “Write to storage”",
   "リアルタイム同期をONにしました": "Real-time sync is now ON",
   "このブラウザでは保存先フォルダの指定に対応していません。Chrome / Edge 系ブラウザを利用してください。": "This browser does not support choosing a storage folder. Please use Chrome or Edge.",
   "保存先フォルダへのアクセスが許可されませんでした": "Access to the storage folder was not granted",
@@ -989,7 +989,7 @@ const I18N_EN = {
   "サイドバー幅を調整（ダブルクリックで初期幅）": "Drag to resize the sidebar (double-click to reset)",
   "＋ 追加": "+ Add",
   "コレクション操作": "Collection actions",
-  "\\\\cite をコピー": "Copy \\\\cite",
+  "\\cite をコピー": "Copy \\cite",
   "AI用 Markdown": "Markdown for AI",
   "タイトル・著者・キーワードで検索...": "Search by title, author, keyword…",
   "文献を検索": "Search papers",
@@ -1024,6 +1024,7 @@ function detectLang() {
 let LANG = detectLang();
 function t(key, vars) {
   let s = (LANG === 'en' && Object.prototype.hasOwnProperty.call(I18N_EN, key)) ? I18N_EN[key] : key;
+  if (vars && LANG === 'en') s = s.replace(/\{(\w+)\}(\s+(?:[A-Za-z]+\s+)?[A-Za-z]+)\(s\)/g, (m, k, w) => (Object.prototype.hasOwnProperty.call(vars, k) ? ('{' + k + '}' + (Number(vars[k]) === 1 ? w : w + 's')) : m));
   if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (Object.prototype.hasOwnProperty.call(vars, k) ? vars[k] : m));
   return s;
 }
@@ -1537,7 +1538,9 @@ async function restoreStorageFolder() {
     STORAGE_STATE.realtimeSync = realtimeSync !== false;
     STORAGE_STATE.folderHandle = handle || null;
     STORAGE_STATE.syncBaseline = syncBaseline ? canonicalizeLibraryData(syncBaseline) : null;
-    STORAGE_STATE.folderName = folderName || (handle && handle.name) || '';
+    // older versions stored the translated placeholder ("選択済みフォルダ" / "Selected folder") as the name
+    const PLACEHOLDER_NAMES = ['\u9078\u629e\u6e08\u307f\u30d5\u30a9\u30eb\u30c0', I18N_EN['\u9078\u629e\u6e08\u307f\u30d5\u30a9\u30eb\u30c0']];
+    STORAGE_STATE.folderName = (folderName && !PLACEHOLDER_NAMES.includes(folderName) ? folderName : '') || (handle && handle.name) || '';
     STORAGE_STATE.lastSyncedAt = lastSyncedAt || '';
     STORAGE_STATE.status = handle ? 'folder' : 'browser';
     recomputeLocalDiff();
@@ -1589,7 +1592,7 @@ async function toggleRealtimeSync() {
       clearTimeout(STORAGE_STATE.syncTimer);
       STORAGE_STATE.syncTimer = null;
     }
-    toast(t('リアルタイム同期をOFFにしました。以後は「保存先から読み込む」または「今すぐ同期」を押すまで同期しません'));
+    toast(t('リアルタイム同期をOFFにしました。以後は「保存先から読み込む」または「保存先へ書き出し」を押すまで同期しません'));
   } else {
     toast(t('リアルタイム同期をONにしました'));
     if (STORAGE_STATE.folderHandle) {
@@ -1610,7 +1613,7 @@ async function chooseStorageFolder() {
     const ok = await ensureFolderPermission(handle);
     if (!ok) throw new Error(t('保存先フォルダへのアクセスが許可されませんでした'));
     STORAGE_STATE.folderHandle = handle;
-    STORAGE_STATE.folderName = handle.name || t('選択済みフォルダ');
+    STORAGE_STATE.folderName = handle.name || '';
     STORAGE_STATE.status = 'folder';
     await putSetting('storageFolderHandle', handle);
     await putSetting('storageFolderName', STORAGE_STATE.folderName);
@@ -1779,7 +1782,7 @@ async function importDataFromFolder(handle, opts = {}) {
 
   S.selectedId = S.papers[0] ? S.papers[0].id : null;
   STORAGE_STATE.folderHandle = handle;
-  STORAGE_STATE.folderName = STORAGE_STATE.folderName || handle.name || t('選択済みフォルダ');
+  STORAGE_STATE.folderName = STORAGE_STATE.folderName || handle.name || '';
   STORAGE_STATE.status = 'folder';
   setSyncBaseline({ papers: S.papers, collections: S.collections });
   STORAGE_STATE.syncSuspended = true;
@@ -1902,7 +1905,7 @@ async function syncAllDataToChosenFolder(showToast = false) {
     STORAGE_STATE.remoteLastSeenFingerprint = stableFingerprint(exportData);
     await putSetting('syncedPaths', currentPaths);
     await putSetting('lastSyncedAt', STORAGE_STATE.lastSyncedAt);
-    await putSetting('storageFolderName', STORAGE_STATE.folderName || handle.name || t('選択済みフォルダ'));
+    await putSetting('storageFolderName', STORAGE_STATE.folderName || handle.name || '');
     await putSetting('syncBaseline', STORAGE_STATE.syncBaseline);
 
     STORAGE_STATE.syncSuspended = true;
@@ -1932,9 +1935,9 @@ function h(s) {
 }
 
 function decodeEntities(s) {
-  const t = document.createElement('textarea');
-  t.innerHTML = String(s ?? '');
-  return t.value;
+  const ta = document.createElement('textarea');
+  ta.innerHTML = String(s ?? '');
+  return ta.value;
 }
 
 function plainText(s) {
@@ -1974,8 +1977,8 @@ const BIB_LIGATURES = { 'ﬀ': 'ff', 'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬃ': 'ffi', '�
 // DOM node -> text. keep=true retains <sub>/<sup>/<i>/<b>; everything else is flattened.
 function bibNodeToText(node, keep) {
   if (node.nodeType === 3) {
-    const t = node.nodeValue || '';
-    return keep ? t.replace(/&(?=#?[a-z0-9]+;)/gi, '&amp;').replace(/</g, '&lt;') : t;
+    const txt = node.nodeValue || '';
+    return keep ? txt.replace(/&(?=#?[a-z0-9]+;)/gi, '&amp;').replace(/</g, '&lt;') : txt;
   }
   if (node.nodeType !== 1 && node.nodeType !== 11) return '';
   const name = String(node.localName || node.nodeName || '').toLowerCase().replace(/^.*:/, '');
@@ -2050,15 +2053,15 @@ const TEX_GREEK = { alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 
 const TEX_SYMBOLS = { times: '×', pm: '±', approx: '≈', sim: '∼', leq: '≤', le: '≤', geq: '≥', ge: '≥', neq: '≠', to: '→', rightarrow: '→', leftarrow: '←', leftrightarrow: '↔', rightleftharpoons: '⇌', circ: '°', cdot: '·', infty: '∞', AA: 'Å' };
 
 function texMathToInline(math, keep) {
-  let t = String(math);
+  let out = String(math);
   for (let i = 0; i < 4; i++) {
-    t = t.replace(/\\(?:mathrm|mathit|mathbf|mathsf|mathcal|text|textrm|textit|rm|it|bf)\s*\{([^{}]*)\}/g, '$1');
+    out = out.replace(/\\(?:mathrm|mathit|mathbf|mathsf|mathcal|text|textrm|textit|rm|it|bf)\s*\{([^{}]*)\}/g, '$1');
   }
-  t = t.replace(/\\([A-Za-z]+)\s*/g, (_, n) => TEX_GREEK[n] ?? TEX_SYMBOLS[n] ?? '');
+  out = out.replace(/\\([A-Za-z]+)\s*/g, (_, n) => TEX_GREEK[n] ?? TEX_SYMBOLS[n] ?? '');
   const wrap = (tag, body) => keep ? `<${tag}>${body}</${tag}>` : body;
-  t = t.replace(/_\s*\{([^{}]*)\}|_\s*([A-Za-z0-9+\-])/g, (_, a, b) => wrap('sub', a ?? b));
-  t = t.replace(/\^\s*\{([^{}]*)\}|\^\s*([A-Za-z0-9+\-])/g, (_, a, b) => wrap('sup', a ?? b));
-  return t.replace(/[{}]/g, '');
+  out = out.replace(/_\s*\{([^{}]*)\}|_\s*([A-Za-z0-9+\-])/g, (_, a, b) => wrap('sub', a ?? b));
+  out = out.replace(/\^\s*\{([^{}]*)\}|\^\s*([A-Za-z0-9+\-])/g, (_, a, b) => wrap('sup', a ?? b));
+  return out.replace(/[{}]/g, '');
 }
 
 function texToText(value, keep = false, opts = {}) {
@@ -2557,7 +2560,7 @@ function bibToTex(value, opts = {}) {
 function genBib(p, options = {}) {
   const includeAbstract = options.includeAbstract === true;
   const tMap = { article:'article', inproceedings:'inproceedings', book:'book', preprint:'misc', misc:'misc', phdthesis:'phdthesis', mastersthesis:'mastersthesis' };
-  const t = tMap[p.type] || 'misc';
+  const entryType = tMap[p.type] || 'misc';
   const k = normalizeBibKey(options.key || p.bibtexKey || bKey(p)) || 'reference';
   const fields = [];
   const f = (name, value, mode = 'text') => {
@@ -2565,7 +2568,12 @@ function genBib(p, options = {}) {
     const converted = mode === 'literal' ? bibToTex(String(value), { accents: false }) : bibToTex(value);
     fields.push([name, converted]);
   };
-  if (p.authors?.length) f('author', p.authors.join(' and '));
+  if (p.authors?.length) {
+    // A name that itself contains " and " (e.g. a corporate author) must stay braced,
+    // otherwise BibTeX would split it into several authors.
+    const names = p.authors.map(a => { const s = bibToTex(a); return / and /i.test(s) ? `{${s}}` : s; }).filter(Boolean);
+    if (names.length) fields.push(['author', names.join(' and ')]);
+  }
   if (p.title) fields.push(['title', `{${bibToTex(p.title)}}`]);
   if (p.type === 'article') f('journal', p.journal);
   if (p.type === 'inproceedings') f('booktitle', p.booktitle || p.journal);
@@ -2590,7 +2598,7 @@ function genBib(p, options = {}) {
   const lines = fields.map(([name, value], index) =>
     `  ${name.padEnd(width)} = {${value}}${index < fields.length - 1 ? ',' : ''}`
   );
-  return [`@${t}{${k},`, ...lines, '}', ''].join('\n');
+  return [`@${entryType}{${k},`, ...lines, '}', ''].join('\n');
 }
 
 /* ============================================================
@@ -2800,7 +2808,7 @@ function filtered() {
   else if (S.view === 'reading')   pp = pp.filter(p => p.readStatus==='reading');
   else if (S.view === 'read')      pp = pp.filter(p => p.readStatus==='read');
   else if (S.view.startsWith('col:')) { const c=S.view.slice(4); pp=pp.filter(p=>(p.collections||[]).includes(c)); }
-  else if (S.view.startsWith('tag:')) { const t=S.view.slice(4); pp=pp.filter(p=>(p.tags||[]).includes(t)); }
+  else if (S.view.startsWith('tag:')) { const tg=S.view.slice(4); pp=pp.filter(p=>(p.tags||[]).includes(tg)); }
 
   if (S.filters.search) {
     const q = S.filters.search.toLowerCase();
@@ -2846,7 +2854,7 @@ function renderSidebar() {
         rd=cnt(p=>p.readStatus==='read');
 
   const tagCounts = {};
-  S.papers.forEach(p => (p.tags||[]).forEach(t => { tagCounts[t]=(tagCounts[t]||0)+1; }));
+  S.papers.forEach(p => (p.tags||[]).forEach(tg => { tagCounts[tg]=(tagCounts[tg]||0)+1; }));
 
   const item = (view, ico, lbl, cnt) => {
     const a = S.view===view?'active':'';
@@ -2855,7 +2863,7 @@ function renderSidebar() {
   };
 
   const storageName = STORAGE_STATE.available
-    ? (STORAGE_STATE.folderName || t('ブラウザ内に保存'))
+    ? (STORAGE_STATE.folderName || (STORAGE_STATE.status === 'folder' ? t('選択済みフォルダ') : t('ブラウザ内に保存')))
     : t('このブラウザでは未対応');
   const realtimeLabel = STORAGE_STATE.realtimeSync ? 'ON' : 'OFF';
   const storageStatus = !STORAGE_STATE.available
@@ -2981,7 +2989,7 @@ function renderList() {
       ? (p.authors||[]).slice(0,3).map(a=>a.split(',')[0].trim()).join(', ') + (p.authors.length>3?t(' ほか'):'')
       : t('著者不明');
     const rs = p.readStatus||'unread';
-    const tags = (p.tags||[]).slice(0,3).map(t=>`<span class="tag-pill">${h(t)}</span>`).join('');
+    const tags = (p.tags||[]).slice(0,3).map(tg=>`<span class="tag-pill">${h(tg)}</span>`).join('');
     const cit = p.citationCount!=null ? `<span class="pi-cit">${t('被引用')} ${p.citationCount}</span>` : '';
     const sel = S.selectedId===p.id?'sel':'';
     return `<div class="paper-item ${sel}" role="button" tabindex="0" aria-selected="${S.selectedId===p.id}" data-action="select-paper" data-id="${h(p.id)}">
@@ -3028,8 +3036,8 @@ function renderDetail() {
       <span>${h(c.name)}</span>
     </label>`).join('');
 
-  const tagsHtml = (p.tags||[]).map(t =>
-    `<span class="tag-edit">${h(t)}<button type="button" data-action="remove-tag" data-id="${h(p.id)}" data-tag="${h(t)}">✕</button></span>`
+  const tagsHtml = (p.tags||[]).map(tg =>
+    `<span class="tag-edit">${h(tg)}<button type="button" data-action="remove-tag" data-id="${h(p.id)}" data-tag="${h(tg)}">✕</button></span>`
   ).join('');
 
   const sbtn = (s, lbl) => {
@@ -3129,7 +3137,7 @@ function addTag(id, tag) {
 function rmTagBtn(btn) {
   const id=btn.dataset.id, tag=btn.dataset.tag;
   const p=S.papers.find(q=>q.id===id);
-  if (p) { p.tags=p.tags.filter(t=>t!==tag); save(); render(); }
+  if (p) { p.tags=p.tags.filter(x=>x!==tag); save(); render(); }
 }
 function tagKeydown(e, id) {
   if (e.key==='Enter'||e.key===',') { addTag(id,e.target.value); e.target.value=''; e.preventDefault(); }
@@ -3404,10 +3412,10 @@ function closeModal(id) {
   lastModalTrigger = null;
 }
 
-function switchTab(t) {
-  M.tab=t;
+function switchTab(tab) {
+  M.tab=tab;
   const names=['doi','bibtex','manual','pdf'];
-  document.querySelectorAll('.m-tab').forEach((el,i)=>el.classList.toggle('on',names[i]===t));
+  document.querySelectorAll('.m-tab').forEach((el,i)=>el.classList.toggle('on',names[i]===tab));
   renderModalBody();
 }
 

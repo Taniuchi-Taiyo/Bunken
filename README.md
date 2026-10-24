@@ -65,13 +65,21 @@ Exports omit `abstract` by default to keep `.bib` files compact; abstracts remai
 
 - Data is stored locally in your browser or in a selected local folder
 - No server is required
+- An internet connection is needed to fetch from a DOI or arXiv ID and to extract metadata from PDFs (these use CrossRef, arXiv, and the PDF.js library loaded from a CDN). Everything else, including BibTeX import and export, works offline
 - If you choose a folder synced by Dropbox, Google Drive, or a similar service, you can access the same library from multiple devices (avoid simultaneous edits on multiple devices)
 - Supported browsers: recent Chrome and Microsoft Edge versions
 - The “Markdown for AI” export is currently always written in Japanese, regardless of the interface language
 
 ## Development check
 
-Run the dependency-free BibTeX smoke test with `node tests/bibtex-smoke.mjs`.
+Run the dependency-free smoke tests with Node.js:
+
+```sh
+node tests/bibtex-smoke.mjs   # BibTeX import and export
+node tests/i18n-smoke.mjs     # every UI string has an English translation
+```
+
+UI text is written in Japanese in the source and translated through the `I18N_EN` dictionary in `bunken.html`. When you add or edit a UI string, update the dictionary too; `i18n-smoke.mjs` fails if they drift apart.
 
 ## Community and support
 

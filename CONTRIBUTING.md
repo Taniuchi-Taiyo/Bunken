@@ -28,7 +28,7 @@ Use the feature request template. Describe the problem to solve, the proposed be
 2. Keep changes small and explain the user-facing impact.
 3. Update documentation or release notes when behavior changes.
 4. Test `bunken.html` manually in a supported browser, including the affected workflow.
-5. Run `git diff --check` before submitting.
+5. Run `git diff --check`, `node tests/bibtex-smoke.mjs`, and `node tests/i18n-smoke.mjs` before submitting. UI text is written in Japanese in the source and translated through the `I18N_EN` dictionary in `bunken.html`, so update the dictionary whenever you add or edit a UI string.
 6. Complete the pull request template and explain any known limitations.
 
 Because Bunken is a lightweight browser application, there may not be a build step. Please describe the manual verification you performed in the pull request.
