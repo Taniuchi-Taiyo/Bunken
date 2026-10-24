@@ -22,11 +22,11 @@ Bunken(文献)は、研究者のための軽量な文献管理ツールです。
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshot-dark.png">
-    <img src="docs/assets/screenshot-light.png" alt="論文リスト・タグ・コレクション・詳細ペインを備えた Bunken のライブラリ画面" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshot-ja-dark.png">
+    <img src="docs/assets/screenshot-ja-light.png" alt="論文リスト・タグ・コレクション・詳細ペインを備えた Bunken のライブラリ画面" width="100%">
   </picture>
   <br>
-  <sub>デモデータでのライブラリ画面。システムのライト/ダークテーマに追従します。</sub>
+  <sub>デモデータでのライブラリ画面。日本語/英語のインターフェースに対応し、システムのライト/ダークテーマに追従します。</sub>
 </p>
 
 ## ワークフロー
@@ -46,6 +46,7 @@ Bunken(文献)は、研究者のための軽量な文献管理ツールです。
 | **整理** | タグ、コレクション(1つの論文を複数のコレクションに登録可)、読書ステータス、ノート。コレクション内の重複チェック |
 | **ファイル** | PDFや補足資料を自動で整理して保存 |
 | **引用** | 論文単位・コレクション単位でLaTeXに適したBibTeXを書き出し(abstractは既定で省略)、`\cite{key}` をワンクリックでコピー |
+| **言語** | 日本語/英語のインターフェースに対応。初回起動時はブラウザの言語に合わせ、サイドバー下部からいつでも切り替えられます |
 | **保存** | ライブラリとファイルは任意の保存先フォルダで管理。DropboxやGoogle Driveで同期するフォルダを選べば、複数デバイスで同じライブラリを利用可能 |
 
 ## クイックスタート
@@ -66,6 +67,7 @@ Bunken は、軽量な LaTeX ワークフローに意図的に絞っています
 - サーバーは不要です
 - DropboxやGoogle Driveなどで同期されるフォルダを選ぶと、複数デバイスから同じライブラリにアクセスできます(複数デバイスでの同時編集は避けてください)
 - 対応ブラウザ: 最近のバージョンの Chrome と Microsoft Edge
+- 「AI用 Markdown」の出力は、現在のところインターフェースの言語に関わらず日本語で出力されます
 
 ## 開発用チェック
 

@@ -26,7 +26,7 @@ Bunken is a lightweight reference manager for researchers. It is a single HTML f
     <img src="docs/assets/screenshot-light.png" alt="Bunken library view with a paper list, tags, collections and a detail pane" width="100%">
   </picture>
   <br>
-  <sub>Library view with demo data. The interface is currently in Japanese, and follows your system's light or dark theme.</sub>
+  <sub>Library view with demo data. The interface is available in English and Japanese, and follows your system's light or dark theme.</sub>
 </p>
 
 ## Workflow
@@ -46,6 +46,7 @@ Bunken is a lightweight reference manager for researchers. It is a single HTML f
 | **Organize** | Tags, collections (one paper can belong to several), reading status, and notes. Duplicate check within a collection |
 | **Files** | PDFs and supplementary files are organized and stored automatically |
 | **Cite** | LaTeX-friendly BibTeX export for a paper or a whole collection, one-click `\cite{key}` copy (abstract omitted by default) |
+| **Language** | English and Japanese interface. Bunken follows your browser language on first launch, and you can switch any time from the bottom of the sidebar |
 | **Store** | Library and files live in a storage folder you choose. Pick a folder synced by Dropbox or Google Drive to use the same library on multiple devices |
 
 ## Quick Start
@@ -66,6 +67,7 @@ Exports omit `abstract` by default to keep `.bib` files compact; abstracts remai
 - No server is required
 - If you choose a folder synced by Dropbox, Google Drive, or a similar service, you can access the same library from multiple devices (avoid simultaneous edits on multiple devices)
 - Supported browsers: recent Chrome and Microsoft Edge versions
+- The “Markdown for AI” export is currently always written in Japanese, regardless of the interface language
 
 ## Development check
 
